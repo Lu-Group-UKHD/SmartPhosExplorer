@@ -204,14 +204,14 @@ shinyServer(function(input, output, session) {
     if (!is.null(mae())) {
       if (input$assay == "Phosphoproteome" & input$getFP == FALSE) {
         checkboxInput("ifNormCorrect","Perform normalization correction", value = FALSE)
-       
       }
     }
   })
   
   output$ifAlreadyNormBox <- renderUI({
       if(input$ifNormCorrect) {
-          radioButtons("ifAlreadyNorm", "Have the data already been normalized by Spectronaut/MaxQuant ?", c("yes","no"), selected = "no", inline = TRUE)
+          updateRadioButtons(session = getDefaultReactiveDomain(), inputId = "normalize", selected = FALSE)
+          radioButtons("ifAlreadyNorm", "Have the data already been normalized by Spectronaut/MaxQuant ?", c("Yes","No"), selected = "No", inline = TRUE)
       }
   })
   
@@ -223,7 +223,7 @@ shinyServer(function(input, output, session) {
       if (input$assay == "Phosphoproteome") {
         if (input$ifNormCorrect) {
           maeData <- runPhosphoAdjustment(mae(), 
-                                          normalization = ifelse(input$ifAlreadyNorm == "yes", FALSE, TRUE), #depends on whether the data were already normalized
+                                          normalization = ifelse(input$ifAlreadyNorm == "Yes", FALSE, TRUE), #depends on whether the data were already normalized
                                           minOverlap = 3, #at least three overlapped feature between sample pair
                                           completeness = 0.5 #use feature present in at least 50% of the samples
                                           )

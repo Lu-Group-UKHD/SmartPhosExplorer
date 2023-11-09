@@ -741,12 +741,17 @@ runFisher <- function (genes, reference, gmtFile) {
 # Output:
 ## a network of kinase- phosphorylation site interactions
 getDecouplerNetwork <- function(speciesRef) {
-  # define the species taxonomy id
+   
+  ### ADD START ######################################################
+  # Load network of kinase-substrate interaction from omnipathR_kinase_network folder
   if (speciesRef == "Homo sapiens") {
-    speciesID <- 9606
+    decoupler_network <- read.table("omnipathR_kinase_network/Homo_sapiens.tsv", sep = "\t")
   } else if (speciesRef == "Mus musculus") {
-    speciesID <- 10090
+    decoupler_network <- read.table("omnipathR_kinase_network/Mus_musculus.tsv", sep = "\t")
   }
+  print(paste("Loaded", nrow(decoupler_network), "kinase-substrate interactions from OmnipathR"))
+  ### ADD END #########################################################
+  return(decoupler_network)
   # get the PTM network from ominpath and choose phosphorylation/dephosphorylation 
   omnipath_ptm <- OmnipathR::get_signed_ptms(enzsub = OmnipathR::import_omnipath_enzsub(organism=speciesID),
                                              interactions = OmnipathR::import_omnipath_interactions(organism=speciesID))
