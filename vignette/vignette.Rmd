@@ -1,0 +1,456 @@
+---
+title: "SmartPhos Explorer: a ShinyApp pipeline for processing and analysing phosphoproteomics data"
+author: "Shubham Agrawal, Cong Quan Ta"
+date: "2023-11-06"
+output:
+  BiocStyle::html_document:
+    toc_float: true
+vignette: >
+  %\VignetteIndexEntry{"Introduction to Shiny App"}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Introduction
+
+This is a vignette for the Shiny App of the **SmartPhos** package. The shiny app is a pipeline for *proteomics* and *phosphoproteomics* data where users can upload their data and perform preprocessing, exploratory analysis and some downstream analysis as well. The default view of the shiny app:
+
+```{r}
+knitr::include_graphics("images/firstLook.png")
+```
+
+The current tabs are:
+
+* Preprocessing
+* PCA
+* Heatmap
+* Differential expression
+* Time-series clustering
+* Enrichment analysis
+* Kinase activity inference
+
+The vignette will go through the different tabs of the shiny app and explains how each of the functionalities work.
+
+# Preprocessing tab
+
+This tab contains the preprocessing options before diving into the data for exploratory and downstream analysis. This tab allows the user to upload a MultiAssayExperiment object or upload a zip file containing mass spectrometry files. It contains options for selecting between the proteome or phosphoproteome assay. Options for choosing the transformation method, normalization, and displaying the missing values are available. There is also an option for saving the R object in the app.
+
+## Upload options
+
+Uploading is one of the most important steps in the smooth functioning of the app.
+
+```{r, out.width = "350px"}
+knitr::include_graphics("images/2.png")
+```
+
+As shown in the figure, user has the option to decide between uploading a **zip file** and a **MultiAssayExperiment object**. The zip file contains processed files from *Spectronaut* or *MaxQuant*. When using zip file option, there are certain requirements the user needs to follow for the conversion of the data from these file into a multiAssayExperiment object. The necessary requirement for the zip file is to contain a proper *fileTable.txt* file. The details of this file are explained in the next subsection.
+
+### fileTable.txt file
+
+This text file contains the information about the different quantification files and the other experimental details like treatment types, timepoints, etc. The data is arranged in tab separated columns. SmartPhos package make use of this information to generate a multiAssayExperiment object. Shiny app will display an error message if this file is missing or the format of file is incorrect. The important columns to keep in mind when making this file are as follows:
+
+* **fileName**: Contains the names of the files which has the quantification data. Make sure that it contains only the name of the file and not the relative or absolute path. 
+* **id**: Contains sample IDs.
+* **type**: Contains information on the type of search performed on the samples by Spectronaut or MaxQuant. There are two possibilities: *proteome* and *phosphoproteome*. The two types are represented as two assays in the multiAssayExperiment object.
+* **sampleType**: Contains information for enrichment. If the sample is enriched, the sampleType is *Phospho* and for non-enriched, the sampleType is *FullProteome*.
+
+The above mentioned columns are the most important ones. Other than that, filetable.txt can contain columns like:
+
+* **subjectID** with information like patientID, cell lines, etc. 
+* **timepoint** with values like 0min, 20min, 6h, 24h, etc.
+* **replicate** with values rep1, rep2, replicate1 and so on.
+* **treatment** containing information about different treatments.
+
+Here is an example of the fileTable.txt file: 
+
+```{r, out.width = "600px"}
+knitr::include_graphics("images/3.png")
+```
+
+### Column annotations
+
+User have option to select the column annotations when using the zip file method. If the upload of zip file is successful, another widget will appear which will allow the user to select from the different available annotation options. Multiple selections are possible simply by clicking on the list item. 
+
+```{r, out.width = "350px"}
+knitr::include_graphics("images/4.png")
+```
+
+### MultiAssayExperiment object
+
+The other option which the user has is to direct upload a multiAssayExperiment object. It's a class S4 R object and is saved as **rds** file. This object can be created using the functions from SmartPhos package. 
+
+### Error checks and other options
+
+If the processing of zip files or multiAssayExperiment object is successful, then the upload tab will show the total number of samples and features.
+
+```{r, out.width = "350px"}
+knitr::include_graphics("images/5.png")
+```
+
+The user will have option to choose the assay and sample type as shown in the figure above. In case the upload is not successful, the app will display an error message. These error messages are:
+
+```{r, out.width = "350px"}
+knitr::include_graphics("images/error1.png")
+```
+```{r, out.width = "350px"}
+knitr::include_graphics("images/error2.png")
+```
+```{r, out.width = "350px"}
+knitr::include_graphics("images/error3.png")
+```
+
+## Preprocessing options
+
+SmartPhos package performs some pre-filtering and preprocessing based on various threshold values during the generation of the multiAssayExperiment object. On top of that, this panel has different options for preprocessing of the selected assay. The options provided by the shiny app are as follows:
+
+* **Transformation**: The transformation methods available are: log2 and vst (variance stabilizing transformation).
+* **Normalization**: Normalization strategy depends on the selected transformation method. Therefore, the user has option of *Yes* or *No*. If the user selects *Yes*, then for log2 and no transformation, *median scaling* is applied and for vst, *vsn* is applied. 
+* **Missing values**: Users can select what percentage of missing values are allowed. Proteins with missing values above the selected threshold will be removed from all analyses.
+* **Imputation**: Currently three imputation methods are available: 
+  + QRILC (Quantile Regression Imputation of Left-Censored data)
+  + BPCA (Bayesian PCA)
+  + MLE (Maximum Likelihood Estimation)
+  + Random forest
+  
+After selecting the options, press the **Process** button to perform the preprocessing. 
+  
+```{r, out.width="350px"}
+knitr::include_graphics("images/preprocess.png")
+```
+
+## Other options
+
+The preprocessing tab has some more options:
+
+* Plot the completeness of the assay. It will plot a bar plot displaying percentage of completeness for each sample.
+* Launching MatrixQCvis. Another shiny app for exploratory analysis.
+* Saving, loading and removing results. The multiAssayExperiment object can be saved, loaded and removed within the shiny app.
+* Samples which are outliers can be removed. Simply writing the names of the samples (delimited by comma) in the text box will remove those samples.
+* Coloring the box plot based on different annotations is also possible. 
+
+```{r, out.width="320px"}
+knitr::include_graphics("images/otherOptions1.png")
+```
+```{r, out.width="400px"}
+knitr::include_graphics("images/otherOptions2.png")
+```
+
+## Output
+
+The different outputs available to the users are:
+
+* A box plot of intensity values for each samples. 
+* A diagnostic plot of phopho to fullProteome ratio. This plot can be used to decide if the normalization correction should be performed or not. It can also shows the outliers.
+* A data table showing the information about each samples.
+* A bar plot which shows the percentage of completness of each samples. 
+
+
+```{r}
+knitr::include_graphics(c("images/boxPlot.png", "images/logRatio.png",
+                          "images/table.png", "images/completeness.png"))
+```
+
+
+# PCA
+
+This tab performs principal component analysis (PCA) on the imputed assay from the *Preprocessing* tab and then plot the principal components.
+
+```{r, out.width="300px"}
+knitr::include_graphics("images/12.png")
+```
+
+Simply click on **Run PCA** button to perform PCA. The different options available to the users after plotting are:
+
+```{r, out.width="300px"}
+knitr::include_graphics("images/13.png")
+```
+
+* Selecting the principal components for x- and y-axis.
+* Two more dimensions can be added to the data points using **color** and **shape** options.
+* The plotting is done using **Plotly** package, so users have many functionalities. For example, hovering over the plotted data points will display more information, downloading plot as PNG file, etc.
+* PCA values can be downloaded as a tsv file.
+* PCA plot can also be downloaded as a pdf file.
+
+```{r, out.width="490px"}
+knitr::include_graphics("images/pca1.png")
+```
+```{r, out.width="600px"}
+knitr::include_graphics("images/pca2.png")
+```
+```{r, out.width="600px"}
+knitr::include_graphics("images/pca3.png")
+```
+
+
+NOTE: If imputation is selected *none* in the preprocessing tab, then performing PCA is not possible. An error message will pop-up on screen. 
+
+# Heatmap
+
+This tabs allow the user to plot the heatmap of the imputed assay from the preprocessing tab. Users can select from the three choices available:
+
+```{r, out.width="450px"}
+knitr::include_graphics("images/14.png")
+```
+
+* **Top variant**: This allows the users to plot the genes with highest variance. Users can decide the number of top variants genes to plot. This option performs clustering automatically. The user also has the option to divide the columns and rows of the heatmap into specific number of clusters. 
+* **Differentially expressed**: Allows to plot the heatmaps for differentially expressed genes. The differential expression analysis is available in *hypothesis testing* tab and can be performed using ProDA or Limma. 
+* **Selected time series cluster**: After performing the time-series clustering in another tab, users have option to plot the heatmap of the selected cluster.
+
+For all the above-mentioned options, users can add additional column annotations to the plotted heatmap. Adding more column annotations to the heatmap can be helpful to understand the heatmap better and see the patterns in the data more clearly. User can also download the heatmap as a PDF. 
+
+```{r, out.width="300px"}
+knitr::include_graphics("images/15.png")
+```
+
+```{r}
+knitr::include_graphics(c("images/heatmap1.png", "images/heatmap2.png"))
+```
+
+The tab also has error checks. If the user tries to plot the heatmap of differentially expressed genes or the genes from the selected time series cluster prior to performing the aforementioned analysis, an error message will be displayed.
+
+```{r, out.width="400px"}
+knitr::include_graphics("images/errorHeatmap.png")
+```
+
+# Differential expression
+
+This tab performs differential expression analysis on the transformed and normalized assay from the first tab. The goal of performing differential expression analysis is to quantify the expression levels of genes between different experimental conditions using statistical tests.
+
+If the users want paired t-test on the patient IDs, cell lines, etc, then the users must have **subjectID** as one of the column in the *fileTable.txt* file with the relevant information. The subjectID column should also be selected in the additional column annotations before the generation of multiAssayExperiment object. 
+
+The two methods available for performing differential expression analysis are:
+
+* **limma**: uses linear models.
+* **ProDA**: uses probabilistic dropout model.
+
+The users have options to choose between the *treatments per timepoint* and *timepoints per treatment*. If the user select the former, then the differential expression will be performed between two selected treatments for the selected timepoint, where as if the user selects the latter, the differential expression will be performed between two selected timepoints for the selected treatment.
+
+```{r, out.width="300px"}
+knitr::include_graphics("images/16.png")
+```
+
+```{r, out.width="300px"}
+knitr::include_graphics("images/17.png")
+```
+
+The output of differential expression analysis is a table which contains the differentially expressed genes arranged by the lowest p-values. The other information present in the table are: Uniprot ID, log2 fold change, t-statistic, adjusted p-value and some information if the data is phosphoproteomic data. The histogram of p-value is also plotted. 
+
+```{r}
+knitr::include_graphics("images/DEtable.png")
+```
+
+```{r, out.width="400px"}
+knitr::include_graphics("images/pvalueHist.png")
+```
+
+Users have options to filter the differentially expressed genes table based on p-value and log fold change value. There is also an option of using adjusted p-value instead. Box plot for the comparison can be done by simply clicking on the row. The user can download the DE table as a TSV file. 
+
+```{r, out.width="300px"}
+knitr::include_graphics("images/18.png")
+```
+
+```{r}
+knitr::include_graphics("images/DEboxplot.png")
+```
+
+In case the differential expression analysis is not possible for the selected settings, an error message will appear. 
+
+```{r, out.width="400px"}
+knitr::include_graphics("images/errorDEA.png")
+```
+
+# Time series clustering
+
+This tab performs **fuzzy c-means clustering** to group proteins/phosphopeptides based on how their level changed over time. The algorithm considers the time-resolved trend, but not the expression levels. Thus, members of the same cluster would have a similar trend over time (e.g., all increasing or all decreasing), though their expression level can be different.
+
+To use this tab, users must specify the **timepoint** column in the **fileTable.txt** file when preparing the data. The time points are either unit-less numbers (e.g., 1, 2, 3) or are in hour and/or minute, which must be typed as "h" and "min", respectively (e.g., 1min, 2min, 3h). Please notice that mixing the two said options (e.g., 1, 2min, 3) or using other unit for time (e.g., 1hour, 2minute, 3day) will likely lead to wrong results.   
+
+The options for using this tab are as follow:
+
+```{r, out.width="300px"}
+knitr::include_graphics("images/timeSeriesOptions.png")
+```
+
+Users first need to choose a treatment of interest for the analysis. Additionally, if the clustering is performed on either "logFC" or "two-condition expression", a reference treatment should also be chosen. The options to perform clustering on determine what it means for genes to be in the same cluster:  
+
+* **expression**: Genes in the same cluster have the similar trend in their **expression level**.
+* **logFC**: Genes in the same cluster have the similar trend in their fold-change, (**logFC**). The fold-change is the difference in expression level between the two selected treatments.
+* **two-condition expression**: Genes in the same cluster have the similar trend in their **expression level** and between the two treatments.
+
+Users can choose to include or exclude certain time points by checking the boxes. The time points are updated when selecting the treatments.
+
+## Other parameters for the analysis
+* **Use top % variant genes along time**
+* **Filter genes based on spline fit test**: If selected, a spline fitting would be used to filter out genes whose changes are inconsistent. **subjectID** is used to pair samples if provided, otherwise the replicates are considered independent.
+* **Number of clusters**: We advise users to try the analysis with multiple values to select the best number of clusters.
+* **Cut-off for cluster membership probability**: Genes are removed from a cluster if their probability to be in that cluster is below this cut-off value.
+
+## Output
+
+The plot shows the time-course trend of genes in the clusters. If either **expression** or **logFC** was chosen, the color would indicate the genes' membership probability: 
+```{r}
+knitr::include_graphics("images/timeSeriesClust1.png")
+```
+
+If **two-condition expression** was chosen, the color is used to distinguish the treatments:
+```{r}
+knitr::include_graphics("images/timeSeriesClust2.png")
+```
+
+Accompanying the plot is a table show the details of the genes in each cluster. User can select the cluster to view with the drop-down menu on the upper left side of the table. The table can be downloaded as a tsv file. The selected cluster will be used as input for enrichment analysis and kinase activity inference.
+```{r}
+knitr::include_graphics("images/Q_time_series_example_result2.PNG")
+```
+
+Clicking on a gene will show a plot of its time-course expression level:
+```{r}
+knitr::include_graphics("images/Q_time_series_example_result3.PNG")
+```
+
+If no cluster was found, for instance due to cut-off values being too high, users will be informed with a pop-up window:
+```{r}
+knitr::include_graphics("images/timeSeriesErr1.png")
+```
+
+# Enrichment analysis
+
+This tab performs enrichment analysis on genes that are differentially expressed or in a cluster. To use this tab, users would first need to perform either a differential expression analysis or time-series clustering. In the latter case, users would also need to select a cluster of interest in the time-series clustering tab. Options for performing enrichment analysis are shown below:
+```{r, out.width="300px"}
+knitr::include_graphics("images/enrichOptions.png")
+```
+
+* **Select analysis method**: Currently only enrichment analysis is supported
+* **Source of gene list**: Whether to use result from differential expression analysis or time-series cluster
+* **Select enrichment method**: Which method should be used for the analysis. The method is either "PAGE" (Parametric Analysis of Gene Set Enrichment) or "GSEA" (Gene Set Enrichment Analysis) for differential expression result and only Fisher's exact test for time-series clustering. If "GSEA" is chosen, the number of permutations to generate the null distribution should also be specified (default 100).
+* **Statistic used for ranking**: Whether to use t-statistics or logFC for the analysis, only applies to differential expression result.
+* **Select geneset database**: Which geneset database should be used for the analysis.
+* P-value cut-off and option to use FDR.
+
+## Output
+If either differential expression analysis or time-series clustering has not been performed (depending on the selected **Source of gene list**), users would be informed of the error:
+```{r, out.width="300px"}
+knitr::include_graphics("images/Q_enrich_err1.PNG")
+```
+
+Otherwise, the result is shown in a table indicating the genesets' names, number of genes in set, enrichment score (PAGE and GSEA only), and p-values. For differential expression analysis, the numbers of up- and down-regulated genes in the set are also listed:
+
+(differential expression analysis)
+```{r}
+knitr::include_graphics("images/Q_enrich_result1.PNG")
+```
+
+(Time-series clustering)
+```{r}
+knitr::include_graphics("images/Q_enrich_result1.5.PNG")
+```
+
+Clicking on a gene set will open a table showing the details of genes/phosphopeptides in the set:
+```{r}
+knitr::include_graphics("images/Q_enrich_result2.PNG")
+```
+
+Clicking on a gene in this table will highlight genesets containing the gene:
+```{r}
+knitr::include_graphics("images/Q_enrich_result3.PNG")
+```
+
+The tables above can be downloaded as tsv files. Clicking on a gene will also show its expression level either as a boxplot (differential expression analysis) or a scatterplot (time-series clustering).
+```{r}
+knitr::include_graphics("images/Q_enrich_result4.PNG")
+knitr::include_graphics("images/Q_enrich_result5.PNG")
+```
+
+# Kinase activity inference
+
+This tab performs kinase activity inference based on phosphopeptides that are differentially expressed or in a cluster. Similar to enrichment analysis, users would first need to perform either a differential expression analysis or time-series clustering and select a cluster of interest. By combining prior knowledge about known kinase-phosphosite interactions and the data, the tab can infer the activity of the kinases responsible for the phosphopeptides being considered. The activity is estimated by an activity score computed with the package **decoupleR** following the authors' tutorial on Kinase and Transcription Factor activity estimation. For time-series clustering, users can also estimate how likely the kinases are associated with phosphopeptides in the selected cluster.
+
+A network of kinase-phosphosite interactions is constructed using the package **OmnipathR**. Users can choose to construct this network with prior knowledge from either Homo sapiens (taxonomy ID = 9606) or Mus musculus (taxonomy ID = 10090) by choosing the organism in **Select reference species**.
+
+Users need to first select whether to perform the inference on result from either differential expression analysis or time-series clustering:
+```{r,out.width="300px"}
+knitr::include_graphics("images/Q_kinase_settings1.PNG")
+```
+
+## Differential expression
+When selecting differential expression, the list of phosphopeptides from the differential expression analysis are used for kinase activity inference. The options to perform the inference from differential expression analysis result are shown below:
+```{r,out.width="300px"}
+knitr::include_graphics("images/Q_kinase_settings1.PNG")
+```
+
+* **Statistic used for computing the kinase score**: Whether to compute the kinase score based of the t-statistic or logFC from the differential expression analysis.
+* **Number of top kinases in plot**: How many kinases in each direction to display in the plot.
+* **Highlight kinases with p-values under**: Kinases whose p-values are below this threshold will be highlighted.
+
+The output is a table showing the kinases, the activity score, and (adjusted) p-values. Positive scores are highlighted pink while negative ones are highlighted blue. For kinases with the most positive or negative activity score (default 10), their scores are also plotted in a horizontal barplot. Kinases whose p-values under the threshold are colored red.
+```{r}
+knitr::include_graphics("images/Q_kinase_result1.PNG")
+```
+
+**Interpreting the result**: The kinase activity is computed from comparing two conditions, hence it is important to take into account the conditions when interpreting the result. A positive score means that the kinase is more active in the selected condition compared to the reference one, while a negative score means that the kinase is more active in the reference condition.
+
+Selecting a kinase will open a table showing the phosphosites targeted by the kinase. The information shown in the table is from the differential expression analysis: log2FC, t-statistic, peptide sequence, and (adjusted) p-values. We would like to notice that these p-values are from the differential expression analysis and should not be confused with those derived from the kinase activity inference. 
+```{r}
+knitr::include_graphics("images/Q_kinase_result2.PNG")
+```
+
+## Time-series clustering
+
+When selecting time-series clustering, the list of phosphopeptides in the selected cluster (in the **Time series clustering** tab) is used to infer kinase activity. In the next selection box, users should then choose to estimate either the kinase activity score, i.e. how active the kinases are, or how likely the kinases are associated with the cluster.
+```{r, out.width="300px"}
+knitr::include_graphics("images/Q_kinase_settings3.PNG")
+```
+
+### Estimating kinase activity score
+If users choose to estimate the kinase activity score, then the option to perform clustering specified in the **Time series clustering** tab affects the analysis being done. If the option **expression** was chosen, the fold-change in expression levels for consecutive time points would be used for the inference. Thus, the result would reflect how the kinase activity change over time. Below is an example of the result when performing the inference with 4 time points:
+```{r}
+knitr::include_graphics("images/Q_kinase_result3.PNG")
+```
+
+* The table shows the kinases along with its activity score and (adjusted) p-values. The timepoint column shows which two time points were considered when estimating the score. Activity scores are labeled pink if they are positive and blue if negative.
+* The kinase activity scores are plotted in a heatmap and those whose p-values below the threshold are highlighted by asterisk.
+
+Clicking on a kinase will open a table showing the phosphosites targeted by the kinase:
+```{r}
+knitr::include_graphics("images/Q_kinase_result4.PNG")
+```
+
+If the **logFC** or **two-condition expression** option was chosen for time-series clustering, the fold-change in expression levels between the two treatments would be used for the inference. Thus, the result would reflect how the kinase activity differ between two treatments at each time point. The layout of the result is similar to that of the above-mentioned **expression** option:
+```{r}
+knitr::include_graphics("images/Q_kinase_result5.PNG")
+```
+
+If no kinase was found (wrong reference species or no overlap with prior knowledge), users will be informed of the error:
+```{r}
+knitr::include_graphics("images/Q_kinase_err1.PNG")
+```
+
+### Estimating kinase association
+In addition to kinase activity, users can choose to determine whether the kinases are associated with the selected cluster:
+```{r, out.width="300px"}
+knitr::include_graphics("images/Q_kinase_settings2.PNG")
+```
+As of 3rd November 2023, only the Fisher's exact test has been implemented. The GSEA method will be implemented in the near future.
+
+The result for the Fisher's exact test is displayed in a table:
+```{r}
+knitr::include_graphics("images/Q_kinase_result6.PNG")
+```
+
+* **number.pSite.in.cluster**: Number of phosphosites targeted by the kinase and are present in the cluster.
+* **number.pSite.by.kinase**: Number of all phosphosites known to be targeted by the kinase, as derived from the above-mentioned kinase-phosphosite network.
+* **p-value**: p-value from the test.
+* **padj**: adjusted p-value.
+
+Clicking a kinase will open a table showing the phosphosites targeted by the kinase in the cluster.
+```{r}
+knitr::include_graphics("images/Q_kinase_result7.PNG")
+```
+
+
+
+
+           
