@@ -4,6 +4,9 @@
 # Increasing the limit of upload file size from 5 MB to 50 MB
 options(shiny.maxRequestSize=500*1024^2)
 
+#temporary directory for unzip raw data folder
+outDir <- "rawFolder"
+
 shinyServer(function(input, output, session) {
   
   # a reactive val to store the multiassayexperiment object
@@ -42,7 +45,6 @@ shinyServer(function(input, output, session) {
     mae(readRDS(paste0("save/", input$seleFile)))
   })
   
-  outDir <- "rawFolder"
   # zip file
   observeEvent(input$uploadZip, {
     # removing the already existing directory before unzipping
@@ -71,7 +73,7 @@ shinyServer(function(input, output, session) {
           # excluding type since it's already represented by two assays
           selectInput("colAnnoPreprocess", "Select additional column annotations:",
                       colnames(fileTable)[colnames(fileTable) != "type"],
-                      selected = NULL, multiple = TRUE)
+                      selected = colnames(fileTable)[colnames(fileTable) != "type"], multiple = TRUE)
         })
       },
       error = function(e) {
@@ -88,7 +90,9 @@ shinyServer(function(input, output, session) {
   observeEvent(input$processUpload, {
     withProgress(message = 'Processing files', {
       fileTable <- as.data.frame(read.delim(file.path(outDir, "fileTable.txt")))
-      fileTable$fileName <- sub("^", "./rawfolder/", fileTable$fileName)
+      #fileTable$fileName <- sub("^", "./rawFolder/", fileTable$fileName)
+      fileTable$fileName <- file.path(outDir, fileTable$fileName) #outDir is a variable
+      
       tryCatch({
         # for data from Spectronaut
         if (input$tool == "Spectronaut") {
@@ -198,20 +202,31 @@ shinyServer(function(input, output, session) {
   # rendering options for the phospho-enriched or non-enriched sample type 
   output$seleNormCorrect <- renderUI({
     if (!is.null(mae())) {
-      if (input$assay == "Phosphoproteome") {
+      if (input$assay == "Phosphoproteome" & input$getFP == FALSE) {
         checkboxInput("ifNormCorrect","Perform normalization correction", value = FALSE)
+       
       }
     }
+  })
+  
+  output$ifAlreadyNormBox <- renderUI({
+      if(input$ifNormCorrect) {
+          radioButtons("ifAlreadyNorm", "Have the data already been normalized by Spectronaut/MaxQuant ?", c("yes","no"), selected = "no", inline = TRUE)
+      }
   })
   
   
   observeEvent(input$processSelection, {
     withProgress(message = 'Processing files', {
       # normalization correction if selected
+      # first step, whether to perform phospho normalization correction, if phospho data is selected.    
       if (input$assay == "Phosphoproteome") {
         if (input$ifNormCorrect) {
-          maeData <- runPhosphoAdjustment(mae(), normalization = FALSE,
-                                          minOverlap = 3, completeness = 0.8)
+          maeData <- runPhosphoAdjustment(mae(), 
+                                          normalization = ifelse(input$ifAlreadyNorm == "yes", FALSE, TRUE), #depends on whether the data were already normalized
+                                          minOverlap = 3, #at least three overlapped feature between sample pair
+                                          completeness = 0.5 #use feature present in at least 50% of the samples
+                                          )
           assays(maeData[["Phosphoproteome"]])[["Intensity"]] <- assays(maeData[["Phosphoproteome"]])[["Intensity_adjusted"]]
           assays(maeData[["Phosphoproteome"]])[["Intensity_adjusted"]] <- NULL
           # if (is.na(maeData$adjustFactorPP)) {
@@ -225,6 +240,7 @@ shinyServer(function(input, output, session) {
         }
         else maeData <- mae()
       }
+        
       else maeData <- mae()
       # summarizedAssayExperiment object of the selected assay
       se <- maeData[[input$assay]]
@@ -244,7 +260,7 @@ shinyServer(function(input, output, session) {
       else {
         pp <- preprocessPhos(se, filterList = NULL,
                              transform = input$transform,
-                             normalize = input$normalize,
+                             normalize = ifelse(!is.null(input$ifNormCorrect) & input$ifNormCorrect ==FALSE, input$normalize, FALSE), #if normalization correction has been performed, normalization should not be performed again
                              getFP = input$getFP,
                              missCut = input$missFilter,
                              removeOutlier = strsplit(input$outliers, ",\\s*")[[1]],

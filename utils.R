@@ -23,7 +23,7 @@ medianNorm <- function(x, method = "median") {
   return(x-mMat)
 }
 
-#function for performing normalization
+#function for performing normalization of FP and PP samples
 performCombinedNormalization <- function(maeData) {
   
   # get count matrix from FP samples
@@ -47,7 +47,9 @@ removePrefix <- function(name, prefix) {
 }
 
 getRatioMatrix <- function(maeData, normalization = FALSE, getAdjustedPP = FALSE) {
-  
+  # Get the ratios of phospho-proteins (or peptides) intensity in PP samples devided by FP samples 
+  # maeData: multiAssayExpriment output from SmartPhos package
+  # normalization: whether normalization needs to be performed on fullProteome samples. Normalization is necessary normalization has not been performed by Spectronaut.
   stopifnot(is.logical(normalization))
   
   if (!getAdjustedPP) {
@@ -81,8 +83,10 @@ getRatioMatrix <- function(maeData, normalization = FALSE, getAdjustedPP = FALSE
 }
 
 plotLogRatio <- function(maeData, normalization = FALSE) {
-  
+  # Plot the log ration of PP/FP intensities
+    
   ratioMat <- getRatioMatrix(maeData, normalization)
+  
   phosPP <- log2(assay(maeData[,maeData$sampleType == "Phospho"][["Phosphoproteome"]]))
   medianPP <- colMedians(phosPP,na.rm = TRUE)
   names(medianPP) <- removePrefix(colnames(phosPP), "Phospho")
@@ -104,7 +108,8 @@ plotLogRatio <- function(maeData, normalization = FALSE) {
 }
 
 checkRatioMat <- function(ratioMat, minOverlap = 3) {
-  
+  #check the PP/FP ratio matrix and remove feature that do not meet requirements
+    
   excludeSampleList <- c()
   
   #are there any samples that don't have any phospho sites detect in both FP and PP samples?
@@ -301,7 +306,7 @@ preprocessProteome <- function(seData, filterList = NULL, missCut = 50,
   if (transform=="log2") {
     if (normalize) {
       if (is.null(scaleFactorTab)) {
-        assay(fpeSub) <- PhosR::medianScaling(log2(assay(fpeSub)))
+        assay(fpeSub) <- medianNorm(log2(assay(fpeSub)))
       } else {
         assay(fpeSub) <- log2(t(t(assay(fpeSub))/scaleFactorTab[match(paste0(fpeSub$sample),scaleFactorTab$sample),]$scaleFactor))
       }
@@ -322,7 +327,7 @@ preprocessProteome <- function(seData, filterList = NULL, missCut = 50,
   } else if (transform == "none") {
     if (normalize) {
       if (is.null(scaleFactorTab)) {
-        assay(fpeSub) <- PhosR::medianScaling(assay(fpeSub))
+        assay(fpeSub) <- medianNorm(assay(fpeSub))
       } else {
         assay(fpeSub) <- t(t(assay(fpeSub))/scaleFactorTab[match(paste0(fpeSub$sample),scaleFactorTab$sample),]$scaleFactor)
       }
