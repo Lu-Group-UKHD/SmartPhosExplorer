@@ -139,7 +139,7 @@ checkRatioMat <- function(ratioMat, minOverlap = 3) {
   return(excludeSampleList)
 }
 
-runPhosphoAdjustment <- function(maeData, normalization = FALSE, minOverlap = 3, completeness = 0, ncore = 4 ) {
+runPhosphoAdjustment <- function(maeData, normalization = FALSE, minOverlap = 3, completeness = 0, ncore = 1 ) {
   
   #function to opitmize
   esFun <- function(par, data) {
@@ -426,7 +426,7 @@ preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
   if (transform=="log2") {
     if (normalize) {
       if (is.null(scaleFactorTab)) {
-        assay(ppeSub) <- PhosR::medianScaling(log2(assay(ppeSub)))
+        assay(ppeSub) <- medianNorm(log2(assay(ppeSub)))
       } else {
         assay(ppeSub) <- log2(t(t(assay(ppeSub))/scaleFactorTab[match(paste0(ppeSub$sample),scaleFactorTab$sample),]$scaleFactor))
       }
@@ -447,7 +447,7 @@ preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
   } else if (transform == "none") {
     if (normalize) {
       if (is.null(scaleFactorTab)) {
-        assay(ppeSub) <- PhosR::medianScaling(assay(ppeSub))
+        assay(ppeSub) <- medianNorm(assay(ppeSub))
       } else {
         assay(ppeSub) <- t(t(assay(ppeSub))/scaleFactorTab[match(paste0(ppeSub$sample),scaleFactorTab$sample),]$scaleFactor)
       }

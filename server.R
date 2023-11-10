@@ -203,7 +203,7 @@ shinyServer(function(input, output, session) {
   output$seleNormCorrect <- renderUI({
     if (!is.null(mae())) {
       if (input$assay == "Phosphoproteome" & input$getFP == FALSE) {
-        checkboxInput("ifNormCorrect","Perform normalization correction", value = FALSE)
+        checkboxInput("ifNormCorrect","Perform normalization correction (may take long time, no further normalization needed)", value = FALSE)
       }
     }
   })
