@@ -21,7 +21,10 @@ navbarPage("SmartPhos explorer",
            # or phosphoproteome assay. Options for choosing the transformation method,
            # normalization, and displaying the missing values. 
            tabPanel("Preprocesing",
-                    titlePanel("Some basic visualization and filtering"),
+                    h4(a("Instruction on how to use SmartPhosExplorer", 
+                         href="https://www.huber.embl.de/users/jlu/smartPhos/vignette.html",
+                         target="_blank")),
+                    titlePanel("Data input and preprocessing"),
                     sidebarLayout(
                       sidebarPanel(
                         # Input for R object upload or zip file upload
@@ -328,7 +331,7 @@ navbarPage("SmartPhos explorer",
            # only logFC is used
            # The result is then displayed as either barplot (hypothesis testing) or heatmap (time-series clustering). Kinases whose p-values are 
            # smaller than a pre-determined threshold (e.g., 0.05) are highlighted
-           tabPanel(HTML("Kinase activity inference</a></li><li><a href=\"https://www.huber.embl.de/users/jlu/smartPhos/vignette.html\">SmartPhos vignette"),
+           tabPanel("Kinase activity inference",
                     titlePanel("Inferring kinase activity from hypothesis testing or time-series clustering result"),
                     sidebarLayout(
                       sidebarPanel(
