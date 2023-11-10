@@ -742,44 +742,13 @@ runFisher <- function (genes, reference, gmtFile) {
 ## a network of kinase- phosphorylation site interactions
 getDecouplerNetwork <- function(speciesRef) {
    
-  ### ADD START ######################################################
   # Load network of kinase-substrate interaction from omnipathR_kinase_network folder
   if (speciesRef == "Homo sapiens") {
-    decoupler_network <- read.table("omnipathR_kinase_network/Homo_sapiens.tsv", sep = "\t")
+    decoupler_network <- read.table("omnipathR_kinase_network/Homo_sapiens.tsv", sep = "\t", stringsAsFactors = FALSE)
   } else if (speciesRef == "Mus musculus") {
-    decoupler_network <- read.table("omnipathR_kinase_network/Mus_musculus.tsv", sep = "\t")
+    decoupler_network <- read.table("omnipathR_kinase_network/Mus_musculus.tsv", sep = "\t", stringsAsFactors = FALSE)
   }
-  print(paste("Loaded", nrow(decoupler_network), "kinase-substrate interactions from OmnipathR"))
-  ### ADD END #########################################################
-  return(decoupler_network)
-  # get the PTM network from ominpath and choose phosphorylation/dephosphorylation 
-  omnipath_ptm <- OmnipathR::get_signed_ptms(enzsub = OmnipathR::import_omnipath_enzsub(organism=speciesID),
-                                             interactions = OmnipathR::import_omnipath_interactions(organism=speciesID))
-  omnipath_ptm <- omnipath_ptm[omnipath_ptm$modification %in% c("dephosphorylation", "phosphorylation"), ]
-  # remove interactions if "ProtMapper" is the only source
-  omnipath_ptm_filtered <- omnipath_ptm %>%
-    dplyr::filter(!(stringr::str_detect(omnipath_ptm$source, "ProtMapper") & n_resources == 1))
-  print("Removed interactions with ProtMapper as the only source")
-  # select target (substrate_genesymbol) and source (enzyme_genesymbol)
-  KSN <- omnipath_ptm_filtered[, c(4, 3)]
-  # add phosphorylation site to target
-  KSN$substrate_genesymbol <- paste(KSN$substrate_genesymbol, omnipath_ptm_filtered$residue_type, sep = "_") # STY
-  KSN$substrate_genesymbol <- paste(KSN$substrate_genesymbol, omnipath_ptm_filtered$residue_offset, sep = "") 
-  # set direction and likelihood of interaction
-  KSN$mor <- ifelse(omnipath_ptm_filtered$modification == "phosphorylation", 1, -1)
-  KSN$likelihood <- 1
-  # we remove ambiguous modes of regulations (i.e those with the same target and enzyme)
-  KSN$id <- paste(KSN$substrate_genesymbol, KSN$enzyme_genesymbol, sep = "")
-  KSN <- KSN[!(duplicated(KSN$id) | duplicated(KSN$id, fromLast = TRUE)), ]
-  KSN <- KSN[, -5]
-  # rename KSN to fit decoupler format
-  names(KSN)[1:3] <- c("target", "source", "interaction")
-  KSN <- KSN[c("source", "interaction", "target")]
-  # filter out dephosphorylation in network
-  decoupler_network <- KSN %>% filter(interaction==1) %>% 
-    dplyr::rename("mor" = interaction) %>% 
-    tibble::add_column("likelihood" = 1)
-  return(decoupler_network)
+  #print(paste("Loaded", nrow(decoupler_network), "kinase-substrate interactions from OmnipathR"))
 }
 
 # function to calculate kinase score using decoupleR
@@ -811,10 +780,10 @@ calcKinaseScore <- function(resTab, decoupler_network, corrThreshold = 0.9, stat
                                                      .target = target, 
                                                      minsize = 5)
   # check for colinearity and remove interactions with correlation >= threshold
-  correlated_regulons <- decoupleR::check_corr(decoupler_network) %>% 
-    dplyr::filter(correlation >= corrThreshold)
-  decoupler_network <- decoupler_network %>% 
-    dplyr::filter(!source %in% correlated_regulons$source.2)
+  #correlated_regulons <- decoupleR::check_corr(decoupler_network) %>%  #not necessary for now
+  #  dplyr::filter(correlation >= corrThreshold)
+  #decoupler_network <- decoupler_network %>% 
+  #  dplyr::filter(!source %in% correlated_regulons$source.2)
   # adjust the number of permutations to be 1/2 the number of phosphosites being evaluated 
   nPerm <- round(nrow(inputTab)/2)
   nPerm <- ifelse(nPerm <100, 100, nPerm)
@@ -824,7 +793,7 @@ calcKinaseScore <- function(resTab, decoupler_network, corrThreshold = 0.9, stat
                                           sparse = FALSE,
                                           times = nPerm)
   # get the wmean statistics, replace NA scores with 0, and replace NA p_value with 1
-  kinase_activity <- kinase_activity %>% filter(statistic == "wmean") %>%
+  kinase_activity <- kinase_activity %>% dplyr::filter(statistic == "wmean") %>%
     select(-statistic, -condition) %>%
     mutate(score = ifelse(is.na(score), 0, score),
            p_value = ifelse(is.na(p_value), 1, p_value))
