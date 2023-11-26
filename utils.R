@@ -598,10 +598,10 @@ clusterTS <- function(x, k, pCut = NULL, twoCondition = FALSE) {
 }
 
 # Function to filter genes based on spline fitting to remove changes that are not
-# consistent. If patient IDs are available (recognized by "PatID" in fileTable),
+# consistent. If patient IDs are available (recognized by "subjectID" in fileTable),
 # then the changes among patients are taken into account, otherwise the
 # replicates are considered independent.
-splineFilter <- function(exprMat, PatID = NULL, time, df, pCut, ifFDR, treatment = NULL, refTreatment = NULL) {
+splineFilter <- function(exprMat, subjectID = NULL, time, df, pCut, ifFDR, treatment = NULL, refTreatment = NULL) {
   # The time points must have either no unit or in h and/or minute. 
   # If both h and min are present, the minute time points will be converted to h
   if ((all(str_ends(time,"h|min"))) & (!all(str_ends(time,"h"))) & (!all(str_ends(time,"min")))) {
@@ -613,15 +613,15 @@ splineFilter <- function(exprMat, PatID = NULL, time, df, pCut, ifFDR, treatment
   exprMat <- exprMat[complete.cases(exprMat), ]
   if (is.null(treatment)) {
     # one condition or logFC
-    # include PatID in designTab if provided
-    if (is.null(PatID)) {
+    # include subjectID in designTab if provided
+    if (is.null(subjectID)) {
       designTab <- data.frame(row.names = colnames(exprMat))
       designTab$X <- splines::ns(time, df)
       design <- model.matrix(~ 0 + X, data = designTab)
     } else { 
-      designTab <- data.frame(row.names = colnames(exprMat), PatID = PatID)
+      designTab <- data.frame(row.names = colnames(exprMat), subjectID = subjectID)
       designTab$X <- splines::ns(time, df)
-      design <- model.matrix(~ 0 + X + PatID, data = designTab)
+      design <- model.matrix(~ 0 + X + subjectID, data = designTab)
     }
     
     fit <- lmFit(exprMat, design = design)
@@ -637,7 +637,7 @@ splineFilter <- function(exprMat, PatID = NULL, time, df, pCut, ifFDR, treatment
   } else {
     
     # two condition clustering
-    if (is.null(PatID)) {
+    if (is.null(subjectID)) {
       designTab <- data.frame(row.names = colnames(exprMat), treatment = treatment)
       designTab$treatment <- factor(designTab$treatment, levels = unique(treatment))
       designTab$treatment <- relevel(designTab$treatment, refTreatment)
@@ -645,12 +645,12 @@ splineFilter <- function(exprMat, PatID = NULL, time, df, pCut, ifFDR, treatment
       designTab$X <- splines::ns(time, df)
       design <- model.matrix(~ 0 + X*treatment, data = designTab)
     } else {
-      designTab <- data.frame(row.names = colnames(exprMat), PatID = PatID, treatment = treatment)
+      designTab <- data.frame(row.names = colnames(exprMat), subjectID = subjectID, treatment = treatment)
       designTab$treatment <- factor(designTab$treatment, levels = unique(treatment))
       designTab$treatment <- relevel(designTab$treatment, refTreatment)
       designTab$treatment <- droplevels(designTab$treatment)
       designTab$X <- splines::ns(time, df)
-      design <- model.matrix(~ 0 + PatID + X*treatment, data = designTab)
+      design <- model.matrix(~ 0 + subjectID + X*treatment, data = designTab)
     }
     fit <- lmFit(exprMat, design = design)
     fit2 <- eBayes(fit)
@@ -703,15 +703,42 @@ mscale <- function(x, center = TRUE, scale = TRUE, censor = NULL, useMad = FALSE
 }
 
 # function to run fisher test for enrichment analysis (time series clustering only)
-runFisher <- function (genes, reference, gmtFile) {
+## Note: gmtFile is the directory to the .gmt file for pathway enrichment analysis but is also the directory
+##       to the .txt file containing the PTM database, if ptm == TRUE
+## Processing the database file will depend on whether the file is geneset or ptm set.
+## If ptm == TRUE, the ptmset will be used, and each geneset will be split into 2 based on the sites direction
+## of regulation (up or down)
+runFisher <- function (genes, reference, gmtFile, ptm = FALSE) {
+  # retrieve the database
+  if (!ptm) {
+    genesets <- piano::loadGSC(gmtFile)$gsc
+    setList <- 1:length(genesets)
+  } else {
+    genesets <- read.table(gmtFile, sep = "\t", header = TRUE, stringsAsFactors = FALSE) %>%
+      filter(!grepl("KINASE", category)) %>%
+      dplyr::as_tibble() %>%
+      filter(site.ptm == "p") %>%
+      group_by(signature) %>%
+      filter(n() >= 5) %>%
+      ungroup() %>%
+      mutate(signature = ifelse(site.direction == "u", paste0(signature,"_upregulated"), paste0(signature, "_downregulated"))) %>%
+      separate(site.annotation, sep =  ":", into = c("site", "PubMedID"), extra="merge", fill="right") %>%
+      as.data.frame()
+    setList <- unique(genesets$signature)
+  }
+  reference = reference[!reference %in% genes]
   
-  genesets <- piano::loadGSC(gmtFile)$gsc
-  
-  rtab = lapply(1:length(genesets), function(i) {
-    reference = reference[!reference %in% genes]
-    RinSet = sum(reference %in% genesets[[i]])
+  rtab = lapply(setList, function(i) { # here i is the order number of a set in geneset or the name of the set in  ptm set.
+    if (!ptm) {
+      geneset = genesets[[i]]
+      nameSet = names(genesets)[i]
+    } else {
+      geneset = genesets[genesets$signature == i, "site"]
+      nameSet = i
+    }
+    RinSet = sum(reference %in% geneset)
     RninSet = length(reference) - RinSet
-    GinSet = sum(genes %in% genesets[[i]])
+    GinSet = sum(genes %in% geneset)
     GninSet = length(genes) - GinSet
     fmat = matrix(c(GinSet, RinSet, GninSet, RninSet), nrow = 2,
                   ncol = 2, byrow = F)
@@ -720,7 +747,7 @@ runFisher <- function (genes, reference, gmtFile) {
     fish = fisher.test(fmat, alternative = "greater")
     pval = fish$p.value
     inSet = RinSet + GinSet
-    tibble(Name = names(genesets)[i],
+    tibble(Name = nameSet,
            `Gene.number`= GinSet, 
            `Set.size` = inSet, 
            pval = pval)
@@ -812,8 +839,15 @@ plotKinaseDE <- function(scoreTab, nTop = 10, pCut = 0.05) {
     filter(score_sign != 0) %>%  # remove kinases whose scores are 0 in the plot
     group_by(score_sign) %>% slice_max(abs(score), n = nTop)
   p <- ggplot(plotTab, aes(x = reorder(source, score), y = score)) + 
-    geom_bar(aes(fill = significance), stat = "identity") +
-    scale_fill_manual(values = c("indianred", "lightgrey"), labels = c(paste0("p <= ",pCut), paste0("p > ",pCut))) + 
+    geom_bar(aes(fill = significance), stat = "identity") 
+  if (unique(plotTab$significance) == paste0("p > ",pCut)) {
+    p <- p + scale_fill_manual(values = "lightgrey", labels = paste0("p > ",pCut)) 
+  } else if (unique(plotTab$significance) == paste0("p <= ",pCut)) {
+    p <- p + scale_fill_manual(values = "indianred", labels = paste0("p <= ",pCut)) 
+  } else {
+    p <- p + scale_fill_manual(values = c("indianred", "lightgrey"), labels = c(paste0("p <= ",pCut), paste0("p > ",pCut)))
+  }
+  p <- p + 
     theme_linedraw() +
     theme(axis.title = element_text(face = "bold", size = 15),
           axis.text.y = element_text(size =15),
@@ -857,5 +891,372 @@ plotKinaseTimeSeries <- function(scoreTab, pCut = 0.05, clusterName = "cluster1"
           legend.key.height = unit(0.8, "cm"),
           legend.key.width = unit(0.8, "cm"))
   return(p)
+}
+
+
+#### Function to perform PTM-SEA, a modification of the GSEA algorithm to work on databases of site-centric ptm signatures, 
+# in which the direction of regulation (up or down) are specified for each site.
+# Most of this function was similar to the project.geneset() function from the GitHub page for 
+# ssGSEA2.0: https://github.com/broadinstitute/ssGSEA2.0/tree/master. 
+#
+# The function was modified to be compatible with SmartPhosExplorer and make recognizing phosphosites
+# in the signatures stricter. Specifically, a phosphosite is included in a signature if its sign of the 
+# test statistics (+ / -) matches the direction of regulation (u / d, abbreviate for `up` and `down`) 
+# in the signature. This was not considered in the original ssGSEA2.0 algorithm.
+# The function in this script only consider phosphosites (`site.ptm == "p"`). Signatures starting with "KINASE"
+# are not considered since they are targets of kinases and hence would be similar to the kinase activity analysis.
+# --------------------------------------
+# For the publication associated with the algorithm and database please see Krug et al., 2019, at 
+# https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6398202/ 
+# For more descriptions of the signature sets please see the PTM signature database website:
+# https://proteomics.broadapps.org/ptmsigdb/ 
+# --------------------------------------
+## Parameters
+## geneStat: a dataframe with 1 column listing test statistics (t-stat or logFC) named "stat".
+##           row.names are names of the phosphosites.
+## ptmSetDb: database of PTM signature set.
+## nPerm: Number of permutations
+## weight: weighting of the sites based on their test statistic. If weight == 0 then the test statistics do not matter
+## correl.type: Can be "rank", "z.score", or "symm.rank"
+## statistic: Can be "Kolmogorov-Smirnov" or "area.under.RES"
+## min.overlap: Minimum number of sites in the set to be considered for the analysis, default is 5.
+# -----------------------------------------
+## The resulting enrichment score is normalized to account for differences between signature set sizes
+runGSEAforPhospho <- function(geneStat, ptmSetDb, nPerm, weight = 1, correl.type = "rank",
+                              statistic = "Kolmogorov-Smirnov", min.overlap = 5) {
+  # function from the ssGSEA publication, adapted to work with our format
+  ## #############################################################################
+  ##
+  ##           function to calculate GSEA enrichment score
+  ## - apply correlation scheme and weighting
+  ## - calculate ES
+  ## ############################################################################
+  gseaScorePTM <- function (ordered.gene.list, data.expr, gene.set2, 
+                            weight = 1, correl.type = "rank", gene.set.direction = NULL,
+                            statistic = "Kolmogorov-Smirnov", min.overlap = 5) {
+    
+    ##################################################################
+    ## function to calculate ES score
+    score <- function(max.ES, min.ES, RES, gaps, valleys, statistic){
+      ## KM
+      if( statistic == "Kolmogorov-Smirnov" ){
+        if( max.ES > -min.ES ){
+          ES <- signif(max.ES, digits=5)
+          arg.ES <- which.max(RES)
+        } else{
+          ES <- signif(min.ES, digits=5)
+          arg.ES <- which.min(RES)
+        }
+      }
+      ## AUC
+      if( statistic == "area.under.RES"){
+        if( max.ES > -min.ES ){
+          arg.ES <- which.max(RES)
+        } else{
+          arg.ES <- which.min(RES)
+        }
+        gaps = gaps+1
+        RES = c(valleys,0) * (gaps) + 0.5*( c(0,RES) - c(valleys,0) ) * (gaps)
+        ES = sum(RES)
+      }
+      return(list(RES=RES, ES=ES, arg.ES=arg.ES))
+    } ## end function score
+    
+    n.rows = length(ordered.gene.list)
+    
+    ## #######################################
+    ## weighting
+    ## #######################################
+    if (weight == 0) {
+      
+      correl.vector <- rep(1, n.rows)
+      
+    } else if (weight > 0) {
+      ## if weighting is used (weight > 0), bring
+      ## 'correl.vector' into the same order
+      ## as the ordered gene list
+      if (correl.type == "rank") {
+        ##correl.vector <- data.array[ordered.gene.list, sample.index]
+        correl.vector <- data.expr[ordered.gene.list]
+        
+      } else if (correl.type == "symm.rank") {
+        ##correl.vector <- data.array[ordered.gene.list, sample.index]
+        correl.vector <- data.expr[ordered.gene.list]
+        
+        correl.vector <- ifelse(correl.vector > correl.vector[ceiling(n.rows/2)],
+                                correl.vector,
+                                correl.vector + correl.vector - correl.vector[ceiling(n.rows/2)])
+      } else if (correl.type == "z.score") {
+        ##x <- data.array[ordered.gene.list, sample.index]
+        x <- data.expr[ordered.gene.list]
+        correl.vector <- (x - mean(x))/sd(x)
+      }
+    }
+    
+    ## length of gene list - equals number of rows in input matrix
+    N = length(ordered.gene.list)
+    
+    ## #####################################
+    ## directionality of the gene set
+    if(!is.null(gene.set.direction)){
+      
+      ## number of 'd' features
+      d.idx <- which(gene.set.direction=='d')
+      Nh.d <- length(d.idx)
+      Nm.d <-  N - Nh.d
+      ## locations of 'd' features
+      tag.d <- sign( match(ordered.gene.list, gene.set2[ d.idx ], nomatch=0) )
+      if (weight == 0) {
+        ind.d = which(tag.d == 1)} else {
+          ind.d = which(tag.d == 1 & correl.vector < 0)}
+      number.d = length(ind.d)
+      
+      ## number of 'u' features
+      u.idx <- which(gene.set.direction=='u')
+      Nh.u <- length(u.idx)
+      Nm.u <-  N - Nh.u
+      ## locations of 'up' features
+      tag.u <- sign( match(ordered.gene.list, gene.set2[ u.idx ], nomatch=0) )
+      if (weight == 0) {
+        ind.u = which(tag.u == 1)} else {
+          ind.u = which(tag.u == 1 & correl.vector >= 0)}
+      number.u = length(ind.u)
+      
+      
+      ########################################
+      ## up-regulated part
+      ########################################
+      if(number.u > 1){
+        
+        ## extract and apply weighting
+        correl.vector.u <- correl.vector[ind.u]
+        correl.vector.u <- abs(correl.vector.u)^weight           ## weighting
+        
+        sum.correl.u <- sum(correl.vector.u)
+        
+        up.u <- correl.vector.u/sum.correl.u         ## steps up in th random walk
+        gaps.u <- (c(ind.u-1, N) - c(0, ind.u))      ## gaps between hits
+        down.u <- gaps.u/Nm.u                        ## steps down in the random walk
+        
+        RES.u <- cumsum(up.u-down.u[1:length(up.u)])  # OLD: RES.u <- cumsum(c(up.u,up.u[Nh.u])-down.u)
+        
+        valleys.u = RES.u-up.u
+        
+        max.ES.u = suppressWarnings(max(RES.u))
+        min.ES.u = suppressWarnings(min(valleys.u))
+        
+        ## calculate final score
+        score.res <- score(max.ES.u, min.ES.u, RES.u, gaps.u, valleys.u, statistic)
+        ES.u <- score.res$ES
+        arg.ES.u <- score.res$arg.ES
+        RES.u <- score.res$RES
+        
+      } else {
+        correl.vector.u <- rep(0, N)
+        ES.u=0
+        RES.u=0
+        arg.ES.u=NA
+        up.u=0
+        down.u=0
+      }
+      
+      ## ######################################
+      ## down-regulated part
+      ## ######################################
+      if(number.d > 1){  
+        ## extract and apply weighting
+        correl.vector.d <- correl.vector[ind.d]
+        correl.vector.d <- abs(correl.vector.d)^weight           ## weighting
+        
+        sum.correl.d <- sum(correl.vector.d)
+        
+        up.d <- correl.vector.d/sum.correl.d
+        gaps.d <- (c(ind.d-1, N) - c(0, ind.d))
+        down.d <- gaps.d/Nm.d
+        
+        RES.d <- cumsum(up.d-down.d[1:length(up.d)])               ## RES.d <- cumsum(c(up.d,up.d[Nh.d])-down.d)
+        valleys.d = RES.d-up.d
+        
+        max.ES.d = suppressWarnings(max(RES.d))
+        min.ES.d = suppressWarnings(min(valleys.d))
+        
+        ## calculate final score
+        score.res <- score(max.ES.d, min.ES.d, RES.d, gaps.d, valleys.d, statistic)
+        ES.d <- score.res$ES
+        arg.ES.d <- score.res$arg.ES
+        RES.d <- score.res$RES
+        
+      } else {
+        correl.vector.d <- rep(0, N)
+        ES.d=0
+        RES.d=0
+        ind.d=NA
+        number.d=0
+        arg.ES.d=NA
+        up.d=0
+        down.d=0
+      }
+      ## ############################
+      ## make sure to meet the min.overlap
+      ## threshold
+      if(Nh.d == 1 & Nh.u < min.overlap | Nh.u == 1 & Nh.d < min.overlap){
+        ES.u <- ES.d <- RES.u <- RES.d <- 0
+        arg.ES <- arg.ES <- NA
+        ind.u <- ind.d <- NULL
+      }
+      
+      ## ###########################
+      ## combine the results
+      ES <- ES.u - ES.d
+      RES <- list(u=RES.u, d=RES.d)
+      arg.ES <- c(arg.ES.u, arg.ES.d)
+      ##tag.indicator <- rep(0, N)
+      correl.vector = list(u=correl.vector.u, d=correl.vector.d)
+      ##if(!is.null(ind.u))tag.indicator[ind.u] <- 1
+      ##if(!is.null(ind.d))tag.indicator[ind.d] <- -1
+      ind <- list(u=ind.u, d=ind.d)
+      step.up <- list(u=up.u, d=up.d )
+      ##                   step.down <- list(u=down.u, d=down.d )
+      step.down <- list(u=1/Nm.u, d=1/Nm.d)
+      gsea.results = list(ES = ES, ES.all = list(u=ES.u, d=ES.d), arg.ES = arg.ES, RES = RES, indicator = ind, correl.vector = correl.vector, step.up=step.up, step.down=step.down,
+                          number.u = number.u, number.d = number.d)
+      
+      ## ##############################################################
+      ##
+      ##      original ssGSEA code without directionality
+      ##
+      ## ##############################################################
+      
+    } else { ## end  if(!is.null(gene.set.direction))
+      
+      Nh <- length(gene.set2)
+      Nm <-  N - Nh
+      
+      ## #####################################
+      ## match gene set to data
+      tag.indicator <- sign(match(ordered.gene.list, gene.set2, nomatch=0))    # notice that the sign is 0 (no tag) or 1 (tag)
+      ## positions of gene set in ordered gene list
+      ind = which(tag.indicator==1)
+      ## 'correl.vector' is now the size of 'gene.set2'
+      correl.vector <- abs(correl.vector[ind])^weight
+      ## sum of weights
+      sum.correl = sum(correl.vector)
+      
+      #########################################
+      ## determine peaks and valleys
+      ## divide correl vector by sum of weights
+      up = correl.vector/sum.correl     # "up" represents the peaks in the mountain plot
+      gaps = (c(ind-1, N) - c(0, ind))  # gaps between ranked pathway genes
+      down = gaps/Nm
+      
+      RES = cumsum(c(up,up[Nh])-down)
+      valleys = RES[1:Nh]-up
+      
+      max.ES = max(RES)
+      min.ES = min(valleys)
+      
+      ## calculate final score
+      score.res <- score(max.ES, min.ES, RES[1:Nh], gaps, valleys, statistic)
+      
+      ES <- score.res$ES
+      arg.ES <- score.res$arg.ES
+      RES <- score.res$RES
+      
+      gsea.results = list(ES = ES, arg.ES = arg.ES, RES = RES, indicator = ind, correl.vector = correl.vector, step.up=up, step.down=1/Nm)
+    } ## end else
+    
+    return (gsea.results)
+  }
+  
+  
+  # remove KINASE signature since this is analogous to the kinase activity inference part
+  ptmSetDbNoKinase <- ptmSetDb %>%
+    filter(!grepl("KINASE", category))
+  
+  # get the number of PTM sites for each signature
+  ptmSiteCount <- ptmSetDbNoKinase %>%
+    count(signature) %>%
+    rename(no.PTM.site = "n")
+  
+  # preprocessing the geneSetDatabase
+  phosphoSetDb <- ptmSetDbNoKinase %>%
+    dplyr::as_tibble() %>%
+    filter(site.ptm == "p") %>%   
+    group_by(signature) %>%
+    filter(n() >= 5) %>%
+    ungroup() %>%
+    separate(site.annotation, sep =  ":", into = c("site", "PubMedID"), extra="merge", fill="right")
+  
+  # get the number of phospho sites for each signature
+  phosphoSiteCount <- phosphoSetDb %>%
+    count(signature) %>%
+    rename(no.phospho.site = "n")
+  
+  # put input data in a format compatible with gseaScorePTM
+  ordered.gene.list <- row.names(geneStat)
+  data.expr <- geneStat$stat
+  names(data.expr) <- ordered.gene.list
+  # run GSEA for each PTM set
+  rtab <- lapply(phosphoSiteCount$signature, function(signature) {
+    # get number of PTM site and phospho site in the database
+    nPTMsite = as.numeric(ptmSiteCount[ptmSiteCount$signature == signature, "no.PTM.site"])
+    nPpSite = as.numeric(phosphoSiteCount[phosphoSiteCount$signature == signature, "no.phospho.site"])
+    signatureSet = phosphoSetDb[phosphoSetDb$signature == signature,]
+    gene.set2 = signatureSet$site
+    gene.set.direction = signatureSet$site.direction
+    gene.set.PMID = signatureSet$PubMedID
+    # calculate the gsea score
+    if (sum(row.names(geneStat) %in% gene.set2) < min.overlap) {
+      enrichScoreNorm <- enrichScore <- pvalue <- number.u <- number.d <- 0
+    } else {
+      resGSEA = gseaScorePTM(ordered.gene.list, data.expr =  data.expr, gene.set2 = gene.set2, 
+                             weight = weight, correl.type = correl.type,
+                             gene.set.direction = gene.set.direction, min.overlap =  min.overlap)
+      enrichScore = resGSEA$ES
+      if (!is.null(gene.set.direction)) {
+        number.u  = resGSEA$number.u
+        number.d = resGSEA$number.d
+      } else {
+        number.u <- number.d <- 0 
+      }
+      # calculate the null distribution and pvalue
+      if (nPerm == 0) {
+        enrichScoreNorm = enrichScore
+        pvalue = 1
+      } else {
+        nullDistES = sapply(1:nPerm,  function(x) gseaScorePTM(sample(ordered.gene.list), data.expr=data.expr, gene.set2=gene.set2, 
+                                                               weight, correl.type, gene.set.direction = gene.set.direction, min.overlap = min.overlap)$ES)
+        nullDistES = unlist(nullDistES)
+        if (enrichScore >= 0) {
+          nullDistES.pos = nullDistES[nullDistES >= 0]
+          if (length(nullDistES.pos) == 0) nullDistES.pos = 0.5
+          posMean = mean(nullDistES.pos)
+          enrichScoreNorm = enrichScore/posMean
+          s = sum(nullDistES.pos >= enrichScore)/length(nullDistES.pos)
+          pvalue = ifelse(s == 0, 1/nPerm, s)
+        } else {
+          nullDistES.neg = nullDistES[nullDistES < 0]
+          if (length(nullDistES.neg) == 0) nullDistES.neg = 0.5
+          negMean = mean(nullDistES.neg)
+          enrichScoreNorm = enrichScore/negMean
+          s = sum(nullDistES.neg <= enrichScore)/length(nullDistES.neg)
+          pvalue = ifelse(s == 0, 1/nPerm, s)
+        }
+      }
+    }
+    tibble(Name = signature,
+           nSite = number.u + number.d,                      # number of phosphosites in the input data
+           enrichScore = enrichScoreNorm,                    # normalized enrichment score to correct for differences in signature sizes
+           n.P.site.in.Db = nPpSite,                         # number of phosphosites in the database
+           n.PTM.site.in.Db = nPTMsite,                      # number of PTM sites in the database
+           pvalue = pvalue,
+           number.u = number.u,
+           number.d = number.d)
+  }
+  ) %>% bind_rows() %>%
+    filter(nSite>= min.overlap, enrichScore!=0) %>%
+    mutate(p.adj = p.adjust(pvalue, method = "BH")) %>%
+    arrange(pvalue) 
+  return(rtab)
 }
 
