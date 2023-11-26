@@ -263,8 +263,13 @@ navbarPage("SmartPhos explorer",
            # are stored in the geneset folder (.gmt files) at the same directory
            # as the scripts of shiny app.
            # ---------------------
-           # For Phospho-signature enrichment: the method is under construction and remains a possibility. 
-           # The method will be adapted from Krug et al., 2019 (https://doi.org/10.1074%2Fmcp.TIR118.000943)
+           # For Phospho-signature enrichment: the method is available only for phosphoproteome data and use
+           # a site-centric database in which each set (signature set) has PTM sites and their direction of regulation
+           # instead of just protein names. The database were from Krug et al., 2019
+           # (https://doi.org/10.1074%2Fmcp.TIR118.000943) and stored (.txt) locally in the ptmset folder. 
+           # We use the PTM-SEA algorithm from Krug et al. to analyze the result from Differential Exression analysis
+           # and Fisher's exact test for the result from Time series cluster. For the latter, each signature set 
+           # is split into one containing the upregulated phosphosites and one containing the downregulated phosphosites.
            tabPanel("Enrichment analysis",
                     titlePanel("Enrichment analysis on result from Differential expression or Time-series clustering"),
                     sidebarLayout(
@@ -281,31 +286,37 @@ navbarPage("SmartPhos explorer",
                                                       selected = "Pathway enrichment")),
                         radioButtons("seleSourceEnrich", "Source of gene list:",
                                      c("Differential expression", "Time series cluster")),
-                        # select enrichment method for pathway enrichment
-                        conditionalPanel(condition = "input.analysisMethod == 'Pathway enrichment'",
-                                         conditionalPanel(condition = "input.seleSourceEnrich == 'Differential expression'",
+                        conditionalPanel(condition = "input.seleSourceEnrich == 'Differential expression'",
+                                         conditionalPanel(condition = "input.analysisMethod == 'Pathway enrichment' || input.assay == 'Proteome'",
                                                           radioButtons("enrichMethod", 
                                                                        "Select enrichment method",
                                                                        c("PAGE", "GSEA"),
-                                                                       inline = TRUE),
-                                                          conditionalPanel(condition = "input.enrichMethod == 'GSEA'",
-                                                                           numericInput("permNum", 
-                                                                                        "Permutation number",
-                                                                                        value = 100,
-                                                                                        min = 10, max = 10000)),
-                                                          radioButtons("statType",
-                                                                       "Statistic used for ranking:",
-                                                                       c("stat", "log2FC"),
                                                                        inline = TRUE)),
-                                         conditionalPanel(condition = "input.seleSourceEnrich == 'Time series cluster'",
-                                                          radioButtons("enrichMethod1",
-                                                                       "Select enrichment method",
-                                                                       c("Fisher's exact test"),
-                                                                       selected = "Fisher's exact test")),
+                                         conditionalPanel(condition = "input.enrichMethod == 'GSEA' || input.analysisMethod == 'Phospho-signature enrichment'",
+                                                          numericInput("permNum", 
+                                                                       "Permutation number",
+                                                                       value = 100,
+                                                                       min = 10, max = 10000)),
+                                         radioButtons("statType",
+                                                      "Statistic used for ranking:",
+                                                      c("stat", "log2FC"),
+                                                      inline = TRUE)),
+                        conditionalPanel(condition = "input.seleSourceEnrich == 'Time series cluster'",
+                                         radioButtons("enrichMethod1",
+                                                      "Select enrichment method",
+                                                      c("Fisher's exact test"),
+                                                      selected = "Fisher's exact test")),
+                        # select geneset or PTM set
+                        conditionalPanel(condition = "input.analysisMethod == 'Pathway enrichment' | input.assay == 'Proteome'",
                                          selectInput("sigSet", "Select geneset database",
                                                      list.files(path = "geneset/", pattern = "\\.gmt$"),
                                                      selectize = FALSE, 
-                                                     selected = "h.all.v5.1.symbols.gmt", size = 8)),
+                                                     selected = "Cancer_Hallmark.gmt", size = 8)),
+                        conditionalPanel(condition = "input.analysisMethod == 'Phospho-signature enrichment' && input.assay == 'Phosphoproteome'",
+                                         selectInput("sigSetPTM",  "Select PTM set database",
+                                                     list.files(path = "ptmset/", pattern = "\\.txt$"),
+                                                     selectize = FALSE,
+                                                     selected = "Human_PTM.txt", size = 8)),
                         numericInput("sigLevel", label = "P value cut-off for enrichment results",
                                      min = 0, max = 1, value = 0.05),
                         checkboxInput("ifEnrichFDR", label = "use FDR", value = FALSE),
