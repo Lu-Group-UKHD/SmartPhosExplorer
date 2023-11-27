@@ -1479,25 +1479,25 @@ shinyServer(function(input, output, session) {
         if (!is.null(colorList$cols)) {  
           # when the bottom table is clicked, color the pathways according to
           # whether it contains the clicked gene 
-          datatable(resTab,selection = 'single', caption = "Enriched gene sets") %>%
+          datatable(resTab,selection = 'single', caption = "Enriched gene/PTM signature sets") %>%
             formatStyle('Stat',background = styleInterval(c(0), c("lightblue", "pink"))) %>%
             formatStyle('Name', color = styleEqual(resTab$Name, colorList$cols)) %>%
             formatRound(c('Stat', 'p.up', 'p.up.adj', 'p.down', 'p.down.adj'), digits=3)
         } else { 
           # when bottom table was not clicked, do not show colors
-          datatable(resTab,selection = 'single', caption = "Enriched gene sets") %>% 
+          datatable(resTab,selection = 'single', caption = "Enriched gene/PTM signature sets") %>% 
             formatStyle('Stat', background = styleInterval(c(0), c("lightblue", "pink"))) %>%
             formatRound(c('Stat', 'p.up', 'p.up.adj', 'p.down', 'p.down.adj'), digits = 3)
         }
       } else {
         if (!is.null(colorList$cols)) {  
           # when the bottom table is clicked, color the pathways according to whether it contains the clicked gene 
-          datatable(resTab,selection = 'single', caption = "Enriched gene sets") %>%
+          datatable(resTab,selection = 'single', caption = "Enriched gene/PTM signature sets") %>%
             formatStyle('Name', color = styleEqual(resTab$Name, colorList$cols)) %>%
             formatRound(c('pval', 'padj'), digits=3)
         } else { 
           # when bottom table was not clicked, do not show colors
-          datatable(resTab,selection = 'single', caption = "Enriched gene sets") %>% 
+          datatable(resTab,selection = 'single', caption = "Enriched gene/PTM signature sets") %>% 
             formatRound(c('pval', 'padj'), digits = 3)
         }
       }
