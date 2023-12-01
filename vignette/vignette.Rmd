@@ -318,16 +318,20 @@ knitr::include_graphics("images/timeSeriesErr1.png")
 
 # Enrichment analysis
 
-This tab performs enrichment analysis on genes that are differentially expressed or in a cluster. To use this tab, users would first need to perform either a differential expression analysis or time-series clustering. In the latter case, users would also need to select a cluster of interest in the time-series clustering tab. Options for performing enrichment analysis are shown below:
+This tab performs enrichment analysis on genes or phosphosites that are differentially expressed or in a time series cluster. To use this tab, users would first need to perform either a differential expression analysis or time-series clustering. In the latter, users would also need to select a cluster of interest in the time-series clustering tab. We offer the possibilities to perform enrichment analysis on either gene sets (gene-centric) or post-translational modification signature sets (site-centric). In the latter, each set contains PTM site names with direction of regulation (up- or down-regulated) instead of gene names. Only phosphorylation sites will be considered since this pipeline supports proteomic and phosphoproteomic data. The gene sets and PTM signature sets are derived from the Molecular Signatures Database (Subramanian, Tamayo et al.,2005; Liberzon et al., 2011, Liberzon et al., 2015) and the PTM Signature Database version 2.0.0 (Krug et al., 2019), respectively. Users are encouraged to consult the PTMsigDB website (https://proteomics.broadapps.org/ptmsigdb/) and the paper of Krug et al. for details on how PTM signature sets were curated and their annotation.
+
+In gene-centric pathway enrichment, users can perform either Parametric Analysis of Gene Set Enrichment (PAGE) (Kim & Volsky, 2005) or Gene Set Enrichment Analysis (GSEA) (Subramanian, Tamayo et al.,2005) with Differential Expression analysis result. With Time series clustering result, we offer the Fisher's exact test. For phospho-signature enrichment on Differential Expression analysis result, we offer PTM-Signature Enrichment Analysis (PTM-SEA), a method adapted from GSEA by Krug et al. (2019) to be applicable with the PTM Signature Database. On time series clustering result, we offer the Fisher's exact test, in which each signature set is split into two, one containing upregulated and the other downregulated phosphosites.
+
+Options for performing enrichment analysis are shown below:
 ```{r, out.width="300px"}
 knitr::include_graphics("images/enrichOptions.png")
 ```
 
-* **Select analysis method**: Currently only enrichment analysis is supported
+* **Select analysis method**: Whether to perform gene-centric pathway enrichment or site-centric phospho-signature enrichment. If the Proteome assay is selected in the preprocessing tab, only the former is available.
 * **Source of gene list**: Whether to use result from differential expression analysis or time-series cluster
-* **Select enrichment method**: Which method should be used for the analysis. The method is either "PAGE" (Parametric Analysis of Gene Set Enrichment) or "GSEA" (Gene Set Enrichment Analysis) for differential expression result and only Fisher's exact test for time-series clustering. If "GSEA" is chosen, the number of permutations to generate the null distribution should also be specified (default 100).
-* **Statistic used for ranking**: Whether to use t-statistics or logFC for the analysis, only applies to differential expression result.
-* **Select geneset database**: Which geneset database should be used for the analysis.
+* **Select enrichment method**: Which method should be used for the analysis. In pathway enrichment, the method is either "PAGE" (Parametric Analysis of Gene Set Enrichment) or "GSEA" (Gene Set Enrichment Analysis) for differential expression result and only Fisher's exact test for time-series clustering. If "GSEA" is chosen, the number of permutations to generate the null distribution should also be specified (default 100). In phospho-signature enrichment, the method is PTM-SEA (not shown on UI) for differential expression and Fisher's exact test for time series clustering.
+* **Statistic used for ranking**: Whether to use t-statistics or log2FC for the analysis, only applies to differential expression result.
+* **Select geneset database**: Which gene set or PTM signature set database should be used for the analysis. The analysis method chosen above affects the options available here.
 * P-value cut-off and option to use FDR.
 
 ## Output
@@ -336,29 +340,41 @@ If either differential expression analysis or time-series clustering has not bee
 knitr::include_graphics("images/Q_enrich_err1.PNG")
 ```
 
-Otherwise, the result is shown in a table indicating the genesets' names, number of genes in set, enrichment score (PAGE and GSEA only), and p-values. For differential expression analysis, the numbers of up- and down-regulated genes in the set are also listed:
+Otherwise, the result is shown in a table indicating the genesets' names, number of genes in set, enrichment score (PAGE, GSEA, and PTM-SEA), and p-values. In PTM-SEA, each reported enrichment score is normalized by the mean of the null distribution's enrichment score to control for differences in signature set size. For differential expression analysis, the numbers of up- and down-regulated genes in the set are also listed:
 
-(differential expression analysis)
+(Pathway enrichment for Differential Expression analysis)
 ```{r}
 knitr::include_graphics("images/Q_enrich_result1.PNG")
 ```
 
-(Time-series clustering)
+(Pathway enrichment for Time series clustering)
 ```{r}
 knitr::include_graphics("images/Q_enrich_result1.5.PNG")
 ```
 
-Clicking on a gene set will open a table showing the details of genes/phosphopeptides in the set:
+(Phospho-signature enrichment for Differential Expression analysis)
+```{r}
+knitr::include_graphics("images/Q_enrich_result1_Phospho.PNG")
+```
+
+(Phospho-signature enrichment for Time series clustering)
+```{r}
+knitr::include_graphics("images/Q_enrich_result1.5_Phospho.PNG")
+```
+
+As mentioned above, users should consult the PTMsigDB website (https://proteomics.broadapps.org/ptmsigdb/) for more descriptions of the signature sets. For phospho-signature enrichment analysis on time series clustering, the appendix "_upregulated" or "_downregulated" in the set name indicates whether the phosphosites in the set are upregulated or downregulated according to the database.
+
+Clicking on a set will open a table showing the details of genes/phosphopeptides in the set. We would like to notice that for pathway enrichment, a gene with more than one detected phosphosite would appear in several rows of this table, each corresponding to a phosphosite. Nevertheless, the analysis would only consider each gene once regardless of its number of phosphosite, thereby limiting the bias towards genes with several sites. For phospho-signature enrichment, the table has an additional column "PubMedID" (not shown in the figure below), which contains the PubMed identification or hyperlink of the source of the interaction. Multiple sources for a phosphosite are separated by semicolons. 
 ```{r}
 knitr::include_graphics("images/Q_enrich_result2.PNG")
 ```
 
-Clicking on a gene in this table will highlight genesets containing the gene:
+Clicking on a gene/phosphosite in this table will highlight the sets containing it:
 ```{r}
 knitr::include_graphics("images/Q_enrich_result3.PNG")
 ```
 
-The tables above can be downloaded as tsv files. Clicking on a gene will also show its expression level either as a boxplot (differential expression analysis) or a scatterplot (time-series clustering).
+The tables above can be downloaded as tsv files. Clicking on a gene/phosphosite will also show its expression level either as a boxplot (differential expression analysis) or a scatterplot (time-series clustering).
 ```{r}
 knitr::include_graphics("images/Q_enrich_result4.PNG")
 knitr::include_graphics("images/Q_enrich_result5.PNG")
@@ -366,9 +382,9 @@ knitr::include_graphics("images/Q_enrich_result5.PNG")
 
 # Kinase activity inference
 
-This tab performs kinase activity inference based on phosphopeptides that are differentially expressed or in a cluster. Similar to enrichment analysis, users would first need to perform either a differential expression analysis or time-series clustering and select a cluster of interest. By combining prior knowledge about known kinase-phosphosite interactions and the data, the tab can infer the activity of the kinases responsible for the phosphopeptides being considered. The activity is estimated by an activity score computed with the package **decoupleR** following the authors' tutorial on Kinase and Transcription Factor activity estimation. For time-series clustering, users can also estimate how likely the kinases are associated with phosphopeptides in the selected cluster.
+This tab performs kinase activity inference based on phosphopeptides that are differentially expressed or in a cluster. Similar to enrichment analysis, users would first need to perform either a differential expression analysis or time-series clustering and select a cluster of interest. By combining prior knowledge about known kinase-phosphosite interactions and the data, the tab can infer the activity of the kinases responsible for the phosphopeptides being considered. The activity is estimated by an activity score computed with the package **decoupleR** (Badia-I-Mompel et al., 2022) following the authors' tutorial on Kinase and Transcription Factor activity estimation. For time-series clustering, users can also estimate how likely the kinases are associated with phosphopeptides in the selected cluster.
 
-A network of kinase-phosphosite interactions is constructed using the package **OmnipathR**. Users can choose to construct this network with prior knowledge from either Homo sapiens (taxonomy ID = 9606) or Mus musculus (taxonomy ID = 10090) by choosing the organism in **Select reference species**.
+A network of kinase-phosphosite interactions is constructed using the package **OmnipathR** (Türei et al., 2021). Users can choose to construct this network with prior knowledge from either Homo sapiens (taxonomy ID = 9606) or Mus musculus (taxonomy ID = 10090) by choosing the organism in **Select reference species**.
 
 Users need to first select whether to perform the inference on result from either differential expression analysis or time-series clustering:
 ```{r,out.width="300px"}
@@ -450,7 +466,18 @@ Clicking a kinase will open a table showing the phosphosites targeted by the kin
 knitr::include_graphics("images/Q_kinase_result7.PNG")
 ```
 
+# References
+Badia-I-Mompel, P., Santiago, J. V., Braunger, J., Geiß, C., Dimitrov, D., Müller‐Dott, S., Tauš, P., Dugourd, A., Holland, C. H., Flores, R. O. R., & Sáez-Rodríguez, J. (2022). decoupleR: ensemble of computational methods to infer biological activities from omics data. Bioinformatics Advances, 2(1). https://doi.org/10.1093/bioadv/vbac016
 
+Kim, SY., Volsky, D.J. PAGE: Parametric Analysis of Gene Set Enrichment. BMC Bioinformatics 6, 144 (2005). https://doi.org/10.1186/1471-2105-6-144
 
+Krug, K., Mertins, P., Zhang, B., Hornbeck, P., Raju, R., Ahmad, R., Szucs, M. J., Mundt, F., Forestier, D., Jané‐Valbuena, J., Keshishian, H., Gillette, M. A., Tamayo, P., Mesirov, J. P., Jaffe, J. D., Carr, S. A., & Mani, D. R. (2019). A curated resource for phosphosite-specific signature analysis. Molecular & Cellular Proteomics, 18(3), 576–593. https://doi.org/10.1074/mcp.tir118.000943
 
+Liberzon, A., Birger, C., Thorvaldsdóttir, H., Ghandi, M., Mesirov, J. P., & Tamayo, P. (2015). The Molecular Signatures Database (MSigDB) hallmark gene set collection. Cell systems, 1(6), 417–425. https://doi.org/10.1016/j.cels.2015.12.004
+
+Liberzon, A., Subramanian, A., Pinchback, R. M., Thorvaldsdóttir, H., Tamayo, P., & Mesirov, J. P. (2011). Molecular signatures database (MSigDB) 3.0. Bioinformatics, 27(12), 1739–1740. https://doi.org/10.1093/bioinformatics/btr260
+
+Subramanian, A., Tamayo, P., Mootha, V. K., Mukherjee, S., Ebert, B. L., Gillette, M. A., Paulovich, A. G., Pomeroy, S. L., Golub, T. R., Lander, E. S., & Mesirov, J. P. (2005). Gene set enrichment analysis: A knowledge-based approach for interpreting genome-wide expression profiles. Proceedings of the National Academy of Sciences of the United States of America, 102(43), 15545–15550. https://doi.org/10.1073/pnas.0506580102 
+
+Türei, D., Valdeolivas, A., Gul, L., Palacio-Escat, N., Klein, M., Ivanova, O., Ölbei, M., Gábor, A., Theis, F. J., Módos, D., Korcsmáros, T., & Sáez-Rodríguez, J. (2021). Integrated intra‐ and intercellular signaling knowledge for multicellular omics analysis. Molecular Systems Biology, 17(3). https://doi.org/10.15252/msb.20209923
            
