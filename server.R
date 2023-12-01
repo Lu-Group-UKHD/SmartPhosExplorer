@@ -1033,7 +1033,7 @@ shinyServer(function(input, output, session) {
       colnames(exprMat) <- unique(processedDataSub$timeTreat)
     }
     # filter based on variance 
-    sds <- genefilter::rowSds(exprMat)
+    sds <- apply(exprMat,1,sd)
     varPer <- as.numeric(input$topVarTime)
     exprMat <- exprMat[order(sds, decreasing = TRUE)[seq(1, varPer/100*nrow(exprMat))], ]
     
