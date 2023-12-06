@@ -624,42 +624,84 @@ shinyServer(function(input, output, session) {
   ###################################################### differential expression ####################################################
   
   
-  # the selection box to select the first treatment
+  # select sample by sample name
+  output$ID1Box <- renderUI({
+    selectInput("seleID1", "Select sample ID(s) for reference group",
+                processedData()$sample, multiple = TRUE)
+  })
+  
+  output$ID2Box <- renderUI({
+    selectInput("seleID2", "Select sample ID(s) for target group",
+                processedData()$sample, multiple = TRUE)
+  })
+  
+  # the selection box to select treatment for the reference group
   output$treat1Box <- renderUI({
     allTreat <- unique(processedData()$treatment)
-    selectInput("seleTreat1", "Select a reference treatment", allTreat)
-  })
-  
-  # the selection box to select the second treatment
-  output$treat2Box <- renderUI({
-    allTreat <- unique(processedData()$treatment)
-    allTreat <- allTreat[!allTreat %in% input$seleTreat1]
-    selectInput("seleTreat2", "Select a treatment", allTreat)
-  })
-  
-  # select time point for comparing treatments
-  output$timeBox <- renderUI({
-    allTime <- unique(processedData()$timepoint)
-    #allTime <- allTime[allTime != "0h"]
-    selectInput("seleTime", "Select a time point", allTime)
+    selectInput("seleTreat1", "Select treatment(s) for the reference group", allTreat, multiple = TRUE)
   })
   
   # select time point for reference
   output$time1Box <- renderUI({
-    allTime <- unique(processedData()$timepoint)
-    selectInput("seleTime1", "Select a reference time point", allTime)
+    if (!is.null(processedData()$timepoint)) {
+      if (!is.null(input$seleTreat1))
+        allTime <- unique(processedData()[,processedData()$treatment %in% input$seleTreat1]$timepoint) else
+          allTime <- unique(processedData()$timepoint)
+        selectInput("seleTime1", "Select time point(s) for the reference group", allTime, multiple = TRUE)
+    }
+  })
+  
+  # the selection box to select treatment for the target groups
+  output$treat2Box <- renderUI({
+    allTreat <- unique(processedData()$treatment)
+    selectInput("seleTreat2", "Select treatment(s) for the target group", allTreat, multiple = TRUE)
   })
   
   # the select the comparison time point
   output$time2Box <- renderUI({
-    allTime <- unique(processedData()$timepoint)
-    allTime <- allTime[!allTime %in% input$seleTime1]
-    selectInput("seleTime2", "Select a time point", allTime)
+    if (!is.null(processedData()$timepoint)) {
+      if (!is.null(input$seleTreat2))
+        allTime <- unique(processedData()[,processedData()$treatment %in% input$seleTreat2]$timepoint) else
+          allTime <- unique(processedData()$timepoint)
+        selectInput("seleTime2", "Select time point(s) for the target group", allTime, multiple = TRUE)
+    }
   })
   
-  output$treatBox <- renderUI({
-    allTreat <- unique(processedData()$treatment)
-    selectInput("seleTreat", "Select a treatment", allTreat)
+  # List of sample ID for reference group
+  listIDforDE1 <- reactive(
+    if (input$seleID) {
+      selectedID <- input$seleID1
+      selectedID
+    } else {
+      if (!is.null(processedData()$timepoint))
+        selectedID <- processedData()[,processedData()$treatment %in% input$seleTreat1 & processedData()$timepoint %in% input$seleTime1]$sample else
+          selectedID <-processedData()[,processedData()$treatment %in% input$seleTreat1]$sample
+        selectedID
+    }
+  )
+  
+  # List of sample ID for target group
+  listIDforDE2 <- reactive(
+    if (input$seleID) {
+      selectedID <- input$seleID2
+      selectedID
+    } else {
+      if (!is.null(processedData()$timepoint))
+        selectedID <- processedData()[,processedData()$treatment %in% input$seleTreat2 & processedData()$timepoint %in% input$seleTime2]$sample else
+          selectedID <- processedData()[,processedData()$treatment %in% input$seleTreat2]$sample
+        selectedID
+    }
+  )
+  
+  output$infoDE <- renderUI({
+    if ((!is.null(listIDforDE1())) & (!is.null(listIDforDE2()))) {
+      if (length(base::intersect(listIDforDE1(), listIDforDE2())) > 0) {
+        HTML(sprintf("<b>Reference group has %s samples<br/>Target group has %s samples<b><br/>WARNING: some sample(s) are present in both groups<b><br/> ",
+                   length(listIDforDE1()), length(listIDforDE2())))} else {
+        HTML(sprintf("<b>Reference group has %s samples<br/>Target group has %s samples<b><br/> ",
+                                  length(listIDforDE1()), length(listIDforDE2())))
+        }
+    }
   })
   
   output$seleMethodBox <- renderUI({
@@ -669,16 +711,9 @@ shinyServer(function(input, output, session) {
   
   # a reactive object for subsetting RNAseq dataset
   processedDataSub <- reactive({
-    
-    if (input$seleCompare == "treatments per time") {
-      processedData.sub <- processedData()[,processedData()$treatment %in% c(input$seleTreat1, input$seleTreat2)
-                                           & processedData()$timepoint %in% input$seleTime]
-      processedData.sub$comparison <- factor(processedData.sub$treatment, levels = c(input$seleTreat1, input$seleTreat2))
-    } else {
-      processedData.sub <- processedData()[,processedData()$timepoint %in% c(input$seleTime1, input$seleTime2)
-                                           & processedData()$treatment %in% input$seleTreat]
-      processedData.sub$comparison <- factor(processedData.sub$timepoint, levels = c(input$seleTime1, input$seleTime2))
-    }
+    processedData.sub <- processedData()[,processedData()$sample %in% c(listIDforDE1(),listIDforDE2())]
+    processedData.sub$comparison <-  ifelse(processedData.sub$sample %in% listIDforDE1(), "reference", "target")
+    processedData.sub$comparison <- factor(processedData.sub$comparison, levels = c("reference", "target"))
     processedData.sub
   })
   
@@ -961,31 +996,37 @@ shinyServer(function(input, output, session) {
                                   processedData()$timepoint %in% input$seleTimeRange]
       processedDataRef <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & 
                                   processedData()$timepoint %in% input$seleTimeRange]
-      # Match processedDataSub and processedDataRef by subjectID and timepoint if subjectID
-      # is available, otherwise match by only timepoints
+      # Match processedDataSub and processedDataRef by subjectID and timepoint if subjectID is available
       if (!is.null(processedData()$subjectID)) {
         processedDataSub <- processedDataSub[,match(paste0(processedDataRef$subjectID,"_",processedDataRef$timepoint),
                                                     paste0(processedDataSub$subjectID,"_",processedDataSub$timepoint))] # make sure order is the same 
-      } else if (!is.null(processedData()$replicate)) {
-        processedDataSub <- processedDataSub[,match(paste0(processedDataRef$timepoint,"_",processedDataRef$replicate),
-                                                    paste0(processedDataSub$timepoint,"_", processedDataSub$replicate))] # make sure order is the same
-      } else if (!is.null(processedData()$rep)) {
-        processedDataSub <- processedDataSub[,match(paste0(processedDataRef$timepoint,"_",processedDataRef$rep),
-                                                    paste0(processedDataSub$timepoint,"_", processedDataSub$rep))] # make sure order is the same
       } else {
-        print("subjectID and replicate/rep not found. Please make sure either of them are present in the fileTable to compute the fold change accurately.")
-      }
+        # arrange processedDataSub and processedDataRef by timepoints
+        posRef <- posSub <- c()
+        allTimePoint <- unique(processedDataRef$timepoint)
+        for (time in unique(processedDataRef$timepoint)) {
+          pointerSub <- which(processedDataSub$timepoint == time)
+          pointerRef <- which(processedDataRef$timepoint == time)
+          posSub <- append(posSub, pointerSub)
+          posRef <- append(posRef, pointerRef)
+        }
+        processedDataSub <- processedDataSub[,posSub]
+        processedDataRef <- processedDataRef[,posRef]
+      } 
       assayMat <- assay(processedDataSub)
       RefMat <- assay(processedDataRef)
-      fcMat <- assayMat - RefMat
+      
+      #  calculate fold change per matching sample first, apply spline filter, THEN calculate the mean logFC per time point
+      
       if (input$ifFilterFit) {
+        fcMat <- assayMat - RefMat
         if (!is.null(processedDataSub$subjectID)) {
           fcMat <- splineFilter(fcMat, subjectID = processedDataSub$subjectID,
                                 time = processedDataSub$timepoint,
                                 df = length(unique(processedDataSub$timepoint))-1,
                                 pCut = as.numeric(input$pSpline),
                                 ifFDR = input$ifSplineFdr)
-        } else {
+        } else { # i.e. if subjectID is not present
           fcMat <- splineFilter(fcMat, subjectID = NULL,
                                 time = processedDataSub$timepoint,
                                 df = length(unique(processedDataSub$timepoint))-1,
@@ -993,11 +1034,21 @@ shinyServer(function(input, output, session) {
                                 ifFDR = input$ifSplineFdr)
         }
         processedDataSub <- processedDataSub[rownames(fcMat),]
+        exprMat <- lapply(unique(processedDataSub$timepoint), function(tp) {
+          rowMeans(fcMat[,processedDataSub$timepoint == tp])
+        }) %>% bind_cols() %>% as.matrix()
+      } else { # i.e. if choose not to spline filter
+        
+        # calculate the mean intensities per time point, THEN calculate the logFC
+        
+        assayMatMean <- lapply(unique(processedDataSub$timepoint), function(tp) {
+          rowMeans(assayMat[,processedDataSub$timepoint == tp])
+        }) %>% bind_cols() %>% as.matrix()
+        RefMatMean <- lapply(unique(processedDataSub$timepoint), function(tp) {
+          rowMeans(RefMat[,processedDataRef$timepoint == tp])
+        }) %>% bind_cols() %>% as.matrix()
+        exprMat <- assayMatMean -  RefMatMean
       }
-      
-      exprMat <- lapply(unique(processedDataSub$timepoint), function(tp) {
-        rowMedians(fcMat[,processedDataSub$timepoint == tp])
-      }) %>% bind_cols() %>% as.matrix()
       rownames(exprMat) <- rownames(processedDataSub)
       colnames(exprMat) <- unique(processedDataSub$timepoint)
       
@@ -1178,14 +1229,17 @@ shinyServer(function(input, output, session) {
           seqMat <- seqMat[,match(paste0(RefMat$subjectID,"_",RefMat$timepoint),
                                   paste0(seqMat$subjectID,"_",seqMat$timepoint))]  # make sure order is the same 
         }
-        else if (!is.null(processedData()$replicate)) {
-          seqMat <- seqMat[,match(paste0(RefMat$timepoint,"_",RefMat$replicate),
-                                  paste0(seqMat$timepoint,"_",seqMat$replicate))]  # make sure order is the same
-        } else if (!is.null(processedData()$rep)) {
-          seqMat <- seqMat[,match(paste0(RefMat$timepoint,"_",RefMat$rep),
-                                  paste0(seqMat$timepoint,"_",seqMat$rep))]  # make sure order is the same
-        } else {
-          print("subjectID and replicate/rep not found. Please make sure either of them are present in the fileTable to compute the fold change accurately.")
+        else {
+          # arrange processedDataSub and processedDataRef by timepoints
+          posRef <- posSub <- c()
+          for (time in unique(RefMat$timepoint)) {
+            pointerSub <- which(seqMat$timepoint == time)
+            pointerRef <- which(RefMat$timepoint == time)
+            posSub <- append(posSub, pointerSub)
+            posRef <- append(posRef, pointerRef)
+          }
+          seqMat <- seqMat[,posSub]
+          RefMat <- RefMat[,posRef]
         }
         # compute the fold change
         assay(seqMat) <- assay(seqMat) - assay(RefMat)
@@ -1209,7 +1263,7 @@ shinyServer(function(input, output, session) {
       plotTab$time <- as.numeric(gsub("h|min", "", plotTab$time))
       p <- ggplot(plotTab, aes(x= time, y = value)) +
         geom_point(aes(color = treatment), size=3) + 
-        #geom_line(aes(group = patCondi), linetype = "dotted", color = "grey50") + 
+        stat_summary(aes(color=paste("mean",treatment)),fun = mean, geom = "line", linewidth = 2)+
         ylab(yLabText) + xlab("time") + 
         ggtitle(geneSymbol) + theme_bw() + 
         theme(text=element_text(size=15),plot.title = element_text(hjust = 0.5),
@@ -1395,10 +1449,13 @@ shinyServer(function(input, output, session) {
           resTab <- runGSEAforPhospho(geneStat = myCoef, ptmSetDb = ptmSetDb, nPerm =  input$permNum,
                                       weight = 1, correl.type = "rank", statistic = "Kolmogorov-Smirnov", min.overlap = 5) %>%
             as.data.frame()
-          colnames(resTab) <- c("Name", "Site Number", "Stat", "Number phosphosite in database", "Number PTM site in database",
-                                "pvalue", "Number up", "Number down", "p.adj")
+          colnames(resTab) <- c("Name", "Site.number", "Stat", "Number.pSite.Db", "Number.PTM.site.Db",
+                                "pvalue", "Number.up", "Number.down", "padj")
+          resTab <- resTab %>%
+            select(Name,Site.number,Stat,Number.up,Number.down,Number.pSite.Db,
+                   Number.PTM.site.Db, pvalue, padj) # rearrange column order 
           if (input$ifEnrichFDR) {
-            resTab <- filter(resTab, p.adj <= input$sigLevel) %>%
+            resTab <- filter(resTab, padj <= input$sigLevel) %>%
               arrange(desc(Stat))
           } else {
             resTab <- filter(resTab, pvalue <= input$sigLevel) %>%
@@ -1407,12 +1464,6 @@ shinyServer(function(input, output, session) {
           # if all genes are filtered out: show a notification and set
           # GSEres$resTab to NULL to avoid causing error later on
           if (nrow(resTab) > 0) {
-            resTab <- resTab %>%
-              mutate(p.up = ifelse(Stat>=0, pvalue, NA),
-                     p.up.adj = ifelse(Stat>=0, p.adj, NA),
-                     p.down = ifelse(Stat<0, pvalue,NA),
-                     p.down.adj = ifelse(Stat<0, p.adj, NA)) %>%
-              select(-pvalue, -p.adj)
             GSEres$resTab <- resTab
           } else {
             GSEres$resTab <- NULL
@@ -1482,12 +1533,12 @@ shinyServer(function(input, output, session) {
           datatable(resTab,selection = 'single', caption = "Enriched gene/PTM signature sets") %>%
             formatStyle('Stat',background = styleInterval(c(0), c("lightblue", "pink"))) %>%
             formatStyle('Name', color = styleEqual(resTab$Name, colorList$cols)) %>%
-            formatRound(c('Stat', 'p.up', 'p.up.adj', 'p.down', 'p.down.adj'), digits=3)
+            formatRound(which(colnames(resTab) %in% c("Stat", "pvalue", "padj", "p.up","p.up.adj","p.down","p.down","p.down.adj")), digits=3)
         } else { 
           # when bottom table was not clicked, do not show colors
           datatable(resTab,selection = 'single', caption = "Enriched gene/PTM signature sets") %>% 
             formatStyle('Stat', background = styleInterval(c(0), c("lightblue", "pink"))) %>%
-            formatRound(c('Stat', 'p.up', 'p.up.adj', 'p.down', 'p.down.adj'), digits = 3)
+            formatRound(which(colnames(resTab) %in% c("Stat", "pvalue", "padj", "p.up","p.up.adj","p.down","p.down","p.down.adj")), digits = 3)
         }
       } else {
         if (!is.null(colorList$cols)) {  
@@ -1694,19 +1745,18 @@ shinyServer(function(input, output, session) {
             # Match seqMat and RefMat by subjectID and time point OR by time point and replicate (if subjectID not provided)
             if (!is.null(RefMat$subjectID)) {
               seqMat <- seqMat[,match(paste0(RefMat$subjectID,"_",RefMat$timepoint), paste0(seqMat$subjectID,"_",seqMat$timepoint))] #make sure order is the same 
-            } else if (!is.null(RefMat$replicate)) {
-              seqMat <- seqMat[,match(paste0(RefMat$timepoint,"_",RefMat$replicate), paste0(seqMat$timepoint,"_",seqMat$replicate))] #make sure order is the same
-            } else if (!is.null(RefMat$rep)) {
-              seqMat <- seqMat[,match(paste0(RefMat$timepoint,"_",RefMat$rep), paste0(seqMat$timepoint,"_",seqMat$rep))] #make sure order is the same
             } else {
-              print("subjectID and replicate/rep not found. Please make sure either of them are present in the fileTable to compute the fold change accurately.")
-            }
-            # compute the fold change. 
-            if (input$transform != "none") {
-              assays(seqMat)[["Intensity"]] <- assays(seqMat)[["Intensity"]] - assays(RefMat)[["Intensity"]]
-            } else {
-              print("Tranformation method is 'none', so data is being log2-transformed and the fold change is then computed")
-              assays(seqMat)[["Intensity"]] <- log2(assays(seqMat)[["Intensity"]]) - log2(assays(RefMat)[["Intensity"]])
+              posRef <- posSub <- c()
+              for (time in unique(RefMat$timepoint)) {
+                pointerSub <- which(seqMat$timepoint == time)
+                pointerRef <- which(RefMat$timepoint == time)
+                posSub <- append(posSub, pointerSub)
+                posRef <- append(posRef, pointerRef)
+              }
+              seqMat <- seqMat[,posSub]
+              RefMat <- RefMat[,posRef]
+            # compute the fold change
+            assay(seqMat) <- assay(seqMat) - assay(RefMat)
             }
             yLabText <- "logFC"
           } else if (input$clusterFor == "two-condition expression") {
@@ -1744,7 +1794,9 @@ shinyServer(function(input, output, session) {
               geom_point(aes(color = treatment), size=3) + 
               geom_line(aes(group = patCondi), linetype = "dotted", color = "grey50")
           }
-          p <- p + ylab(yLabText) + xlab("time") + 
+          p <- p + 
+            stat_summary(aes(color=paste("mean",treatment)),fun = mean, geom = "line", linewidth = 2) +
+            ylab(yLabText) + xlab("time") + 
             ggtitle(geneSymbol) + theme_bw() + 
             theme(text = element_text(size=15), plot.title = element_text(hjust = 0.5),
                   legend.position = "bottom",
@@ -1818,8 +1870,8 @@ shinyServer(function(input, output, session) {
             output$errMsgKinase <- renderText("")
             # compute the kinase score or report error (usually because the selected organism was not correct)
             tryCatch({
-              scoreTab <- calcKinaseScore(filterDE(), decoupler_network(), statType = input$statTypeKinase)
-              scoreTab <- scoreTab %>% mutate(padj = p.adjust(p_value, method = "BH")) #%>% arrange(p_value)
+              scoreTab <- calcKinaseScore(filterDE(), decoupler_network(), statType = input$statTypeKinase, nPerm = input$nPermKinase)
+              scoreTab <- scoreTab %>% mutate(padj = p.adjust(p_value, method = "BH")) %>% arrange(p_value)
               kinaseRes(scoreTab)
             }, error = function(e) {
               showModal(modalDialog(
@@ -1881,14 +1933,14 @@ shinyServer(function(input, output, session) {
                       siteTime2 <- siteTime2[,match(siteTime1$subjectID,siteTime2$subjectID)]
                       fc <- assay(siteTime2) - assay(siteTime1)
                       clusterDataTime <- data.frame(site = as.character(rowData(siteTab)$site),
-                                                    log2FC = rowMedians(as.matrix(fc)))
+                                                    log2FC = rowMeans(fc))
                     } else {
-                      fc <- rowMedians(as.matrix(assay(siteTime2))) - rowMedians(as.matrix(assay(siteTime1)))
+                      fc <- rowMeans(assay(siteTime2)) - rowMeans(assay(siteTime1))
                       clusterDataTime <- data.frame(site = as.character(rowData(siteTab)$site),
                                                     log2FC = fc)
                     }
                     clusterDataTime <- na.omit(clusterDataTime)
-                    scoreTabTime <- calcKinaseScore(clusterDataTime, decoupler_network(),statType = "log2FC")
+                    scoreTabTime <- calcKinaseScore(clusterDataTime, decoupler_network(),statType = "log2FC", nPerm = input$nPermKinase)
                     scoreTabTime$timepoint <- paste0(time2,"_",time1)
                     timeOrder <- append(timeOrder, paste0(time2,"_",time1))
                     scoreTab <- rbind(scoreTab, scoreTabTime)
@@ -1900,7 +1952,7 @@ shinyServer(function(input, output, session) {
                   for (time in input$seleTimeRange) {
                     clusterDataTime <- clusterData[clusterData$time == time,] %>%
                       select(value, site) %>% rename(log2FC = "value")
-                    scoreTabTime <- calcKinaseScore(clusterDataTime, decoupler_network(), statType = "log2FC")
+                    scoreTabTime <- calcKinaseScore(clusterDataTime, decoupler_network(), statType = "log2FC", nPerm = input$nPermKinase)
                     scoreTabTime$timepoint <- time
                     scoreTab <- rbind(scoreTab, scoreTabTime)
                   }
@@ -1921,14 +1973,14 @@ shinyServer(function(input, output, session) {
                       siteTabTime <- siteTabTime[,match(refTabTime$subjectID, siteTabTime$subjectID)]
                       fc <- assay(siteTabTime) - assay(refTabTime)
                       clusterDataTime <- data.frame(site = as.character(rowData(siteTabTime)$site),
-                                                    log2FC = rowMedians(as.matrix(fc)))
+                                                    log2FC = rowMeans(fc))
                     } else{
-                      fc <- rowMedians(as.matrix(assay(siteTabTime))) - rowMedians(as.matrix(assay(refTabTime)))
+                      fc <- rowMeans(assay(siteTabTime)) - rowMeans(assay(refTabTime))
                       clusterDataTime <- data.frame(site = as.character(rowData(siteTabTime)$site),
                                                     log2FC = fc)
                     }
                     clusterDataTime <- na.omit(clusterDataTime)
-                    scoreTabTime <- calcKinaseScore(clusterDataTime, decoupler_network(), statType = "log2FC")
+                    scoreTabTime <- calcKinaseScore(clusterDataTime, decoupler_network(), statType = "log2FC", nPerm = input$nPermKinase)
                     scoreTabTime$timepoint <- time
                     scoreTab <- rbind(scoreTab, scoreTabTime)
                   }
@@ -1939,6 +1991,7 @@ shinyServer(function(input, output, session) {
                   arrange(p_value)
                 kinaseRes(scoreTab)
               }, error = function(e) {
+                kinaseRes(NULL)
                 showModal(modalDialog(
                   title = "No kinase found...",
                   "Try again with a different organism or a larger phosphosite list.",
@@ -1947,6 +2000,8 @@ shinyServer(function(input, output, session) {
                 ))})
             } else {
               # compute how likely the kinases are associated with the cluster
+              # An error is induced if no kinase is found (wrong organism or list too small)
+              tryCatch({
               if (input$seleAssoMethod == "Fisher's exact test") {
                 # Fisher's exact test to test kinase association with cluster
                 pSiteCluster  <- unique(selectedCluster()$site)
@@ -1970,16 +2025,48 @@ shinyServer(function(input, output, session) {
                          `number.pSite.by.kinase` = inSet, 
                          p_value = pval)
                 }) %>% bind_rows() %>%
-                  filter(number.pSite.in.cluster>0) %>%
-                  mutate(padj = p.adjust(p_value, method = "BH")) %>%
-                  arrange(p_value) 
-                kinaseRes(as.data.frame(rtab))
-              } else {
-                # GSEA to test kinase association with cluster (not yet implemented)
-                output$errMsgKinase <- renderText("Not yet implemented. We're working on it so please check out later!")
-                
+                  filter(number.pSite.in.cluster>0) 
+              } else { # i.e. if seleAssoMethod == 'FGSEA'
+                # GSEA to test kinase association with cluster using FGSEA from decoupleR
+                # Data is taken from clusterTabVal() instead of selectedCluster() since
+                # the former has unrounded probability values
+                selectedTab <- filter(clusterTabVal(), cluster == input$seleCluster) %>% 
+                  distinct(feature, .keep_all = TRUE) %>%
+                  mutate(feature = as.character(feature)) 
+                clusterData <- rowData(processedData()[selectedTab$feature,])
+                inputTab <- selectedTab %>%
+                  mutate(site = clusterData$site) %>%
+                  select(site, prob) %>%
+                  column_to_rownames(var = "site") %>%
+                  arrange(desc(prob))
+                rtab <- decoupleR::run_fgsea(mat = inputTab,
+                                               network = decoupler_network(),
+                                               minsize = 1,
+                                             times = input$nPermKinase) %>%
+                  filter(statistic == "fgsea") %>%
+                  select(-condition, -statistic) %>%
+                  rename(enrich.score = "score")
               }
-            }
+            # adjusting p-values and filtering based on (adjusted) p-values
+            rtab <- rtab %>% 
+              mutate(padj = p.adjust(p_value, method = "BH")) %>%
+              arrange(p_value)
+            if (input$ifKinaseFDR)
+              rtab <- rtab %>% filter(padj <= input$pKinase) else
+                rtab <- rtab %>% filter(p_value <= input$pKinase)
+            # if no kinase: induce an error to show the pop-up window
+            if (nrow(rtab) == 0)
+              stop("No kinase found... perhaps the wrong organism was chosen or the p-value threshold was too low") else
+                kinaseRes(as.data.frame(rtab))
+            }, error = function(e) {
+                kinaseRes(NULL)
+                showModal(modalDialog(
+                  title = "No kinase found...",
+                  "Try again with a different organism or a larger phosphosite list.",
+                  easyClose = TRUE,
+                  footer = NULL
+                ))})
+              }
           })
         } else output$errMsgKinase <- renderText("Please do a time-series clustering (logFC) first")
       }}  else output$errMsgKinase <- renderText("This feature only support phosphoproteome data. Please double check the Preprocessing step!")
@@ -1987,11 +2074,14 @@ shinyServer(function(input, output, session) {
   # output to display plot object
   output$plotKinase <- renderPlot({
     if (!is.null(kinaseRes())) {
+      scoreTab <- kinaseRes()
+      if (input$ifKinaseFDR)
+        scoreTab$p_value <- scoreTab$padj
       if (input$seleSourceKinase == "Differential expression") {
-        plot <- plotKinaseDE(scoreTab = kinaseRes(), nTop = input$nTopKinase, pCut = input$pKinase)
+        plot <- plotKinaseDE(scoreTab, nTop = input$nTopKinase, pCut = input$pKinase)
         plot
       } else {
-        plot <- plotKinaseTimeSeries(scoreTab = kinaseRes(), pCut = input$pKinase, clusterName = input$seleCluster)
+        plot <- plotKinaseTimeSeries(scoreTab, pCut = input$pKinase, clusterName = input$seleCluster)
         plot
       }
     }
@@ -2000,21 +2090,29 @@ shinyServer(function(input, output, session) {
   # output to display table of kinase score
   output$kinaseTab <- DT::renderDataTable({
     if (!is.null(kinaseRes())) {
-      tryCatch({
+      if ((input$seleSourceKinase == "Differential expression") | 
+          ((input$seleSourceKinase == "Time-series cluster") & 
+           (input$seleKinaseTimeMethod == "activity"))){
         # table for kinase activity
         resTab <- kinaseRes() %>% rename(Kinase = "source", Activity = "score")
         datatable(resTab, selection = 'single', rownames = FALSE,
                   caption = "Kinase activity") %>%
           formatStyle('Activity',background=styleInterval(c(0),c("lightblue","pink"))) %>%
           formatRound(c("Activity", "p_value", "padj"), digits = 3)
-      }, error = function(e) {
+      } else { # i.e. if doing kinase association for time-series cluster
         # table for kinase association
-        resTab <- kinaseRes() %>% rename(Kinase = "source") %>%
-          filter(p_value <= input$pKinase)
+        resTab <- kinaseRes() %>% rename(Kinase = "source")
+        if (input$seleAssoMethod == "Fisher's exact test") {
         datatable(resTab, selection = 'single', rownames = FALSE,
-                  caption = "Kinase association to cluster") %>%
+                  caption = paste0("Kinases associated to ", input$seleCluster, ", Fisher's exact test")) %>%
           formatRound(c("p_value", "padj"), digits = 3)
-      })
+        } else { # i.e. if use FGSEA to estimate kinase association
+          datatable(resTab, selection = 'single', rownames = FALSE,
+                    caption = paste0("Kinases associated to ", input$seleCluster, ", FGSEA")) %>%
+            formatStyle('enrich.score',background=styleInterval(c(0),c("lightblue","pink"))) %>%
+            formatRound(c("enrich.score","p_value", "padj"), digits = 3)
+        }
+      }
     }
   })
   
