@@ -227,14 +227,14 @@ The two methods available for performing differential expression analysis are:
 * **limma**: uses linear models.
 * **ProDA**: uses probabilistic dropout model.
 
-The users have options to choose between the *treatments per timepoint* and *timepoints per treatment*. If the user select the former, then the differential expression will be performed between two selected treatments for the selected timepoint, where as if the user selects the latter, the differential expression will be performed between two selected timepoints for the selected treatment.
+To use this tab, users need to select samples for the reference and target group, between which the differential expression analysis will be performed. This can be done by either selecting treatments or selecting sample IDs. In the former, time points should also be specified if the column **timepoint** is present in the *fileTable.txt* file. Multiple treatments and time points can be selected for each group. As the selection is updated for each group, the user interface informs users of the number of samples in each group as well as a warning if a sample is present in both group. The latter option allows users to directly choose which sample to include in each group, thereby allowing more flexibility in sample selection. The two figures below show examples of the user interface when using either option. Notice that a warning was given in the latter since one sample was present in both groups.
 
 ```{r, out.width="300px"}
-knitr::include_graphics("images/16.png")
+knitr::include_graphics("images/Q_DE_option1.PNG")
 ```
 
 ```{r, out.width="300px"}
-knitr::include_graphics("images/17.png")
+knitr::include_graphics("images/Q_DE_option2.PNG")
 ```
 
 The output of differential expression analysis is a table which contains the differentially expressed genes arranged by the lowest p-values. The other information present in the table are: Uniprot ID, log2 fold change, t-statistic, adjusted p-value and some information if the data is phosphoproteomic data. The histogram of p-value is also plotted. 
@@ -324,7 +324,7 @@ In gene-centric pathway enrichment, users can perform either Parametric Analysis
 
 Options for performing enrichment analysis are shown below:
 ```{r, out.width="300px"}
-knitr::include_graphics("images/enrichOptions.png")
+knitr::include_graphics("images/Q_enrich_option1.PNG")
 ```
 
 * **Select analysis method**: Whether to perform gene-centric pathway enrichment or site-centric phospho-signature enrichment. If the Proteome assay is selected in the preprocessing tab, only the former is available.
@@ -340,29 +340,49 @@ If either differential expression analysis or time-series clustering has not bee
 knitr::include_graphics("images/Q_enrich_err1.PNG")
 ```
 
-Otherwise, the result is shown in a table indicating the genesets' names, number of genes in set, enrichment score (PAGE, GSEA, and PTM-SEA), and p-values. In PTM-SEA, each reported enrichment score is normalized by the mean of the null distribution's enrichment score to control for differences in signature set size. For differential expression analysis, the numbers of up- and down-regulated genes in the set are also listed:
+Otherwise, the result is shown in a table indicating the genesets' names, number of genes in set, enrichment score (PAGE, GSEA, and PTM-SEA), and p-values. In PTM-SEA, each reported enrichment score is normalized by the mean of the null distribution's enrichment score to control for differences in signature set size. Example results are shown in the figures below, along with explanation for each column.
 
 (Pathway enrichment for Differential Expression analysis)
 ```{r}
 knitr::include_graphics("images/Q_enrich_result1.PNG")
 ```
 
+* **Name**: Name of the gene set
+* **Gene Number**: Number of genes in the gene set that are also present in the result from Differential Expression analysis.
+* **Stat**: Enrichment score.
+* **p.up, p.up.adj, p.down, p.down.adj**: (adjusted) p-values estimated by the enrichment analysis.
+* **Number up**: Number of genes with logFC > 0
+* **Number down**: Number of genes with logFC < 0
+
 (Pathway enrichment for Time series clustering)
 ```{r}
 knitr::include_graphics("images/Q_enrich_result1.5.PNG")
 ```
+
+* **Gene.number**: Number of genes in the gene set that are also present in the selected cluster.
+* **Set.size**: Number of genes in the gene set in the selected database.
+* **pval, padj**: p-values estimated by the Fisher's exact test.
 
 (Phospho-signature enrichment for Differential Expression analysis)
 ```{r}
 knitr::include_graphics("images/Q_enrich_result1_Phospho.PNG")
 ```
 
+* **Name**: Name of the PTM signature set. Users should consult the PTMsigDB website (https://proteomics.broadapps.org/ptmsigdb/) for more descriptions of the names of these sets.
+* **Site.number**: Number of phosphosites in the signature set that are also in the result from Differential Expression analysis.
+* **Number.up**: Number of phosphosites with logFC > 0 **and** are registered as up-regulated in the signature set.
+* **Number.down**: Number of phosphosites with logFC < 0 **and** are  registered as down-regulated in the signature set.
+* **Number.pSite.Db**: Number of phosphosites belong to the signature set in the selected database.
+* **Number.PTM.site.Db**: Number of PTM sites belong to the signature set in the selected database.
+* **pvalue, padj**: p-value estimated by PTM-SEA.
+
 (Phospho-signature enrichment for Time series clustering)
 ```{r}
 knitr::include_graphics("images/Q_enrich_result1.5_Phospho.PNG")
 ```
 
-As mentioned above, users should consult the PTMsigDB website (https://proteomics.broadapps.org/ptmsigdb/) for more descriptions of the signature sets. For phospho-signature enrichment analysis on time series clustering, the appendix "_upregulated" or "_downregulated" in the set name indicates whether the phosphosites in the set are upregulated or downregulated according to the database.
+* **Name**: the appendix "_upregulated" or "_downregulated" indicates whether the phosphosites in the set are upregulated or downregulated according to the database.
+* **Set.size**: Number of phosphosites belong to the signature set in the selected database.
 
 Clicking on a set will open a table showing the details of genes/phosphopeptides in the set. We would like to notice that for pathway enrichment, a gene with more than one detected phosphosite would appear in several rows of this table, each corresponding to a phosphosite. Nevertheless, the analysis would only consider each gene once regardless of its number of phosphosite, thereby limiting the bias towards genes with several sites. For phospho-signature enrichment, the table has an additional column "PubMedID" (not shown in the figure below), which contains the PubMed identification or hyperlink of the source of the interaction. Multiple sources for a phosphosite are separated by semicolons. 
 ```{r}
@@ -386,10 +406,7 @@ This tab performs kinase activity inference based on phosphopeptides that are di
 
 A network of kinase-phosphosite interactions is constructed using the package **OmnipathR** (Türei et al., 2021). Users can choose to construct this network with prior knowledge from either Homo sapiens (taxonomy ID = 9606) or Mus musculus (taxonomy ID = 10090) by choosing the organism in **Select reference species**.
 
-Users need to first select whether to perform the inference on result from either differential expression analysis or time-series clustering:
-```{r,out.width="300px"}
-knitr::include_graphics("images/Q_kinase_settings1.PNG")
-```
+Users need to first select whether to perform the inference on result from either differential expression analysis or time-series clustering. This selection affects what type of analysis can be done, as is shown in the next two subsections.
 
 ## Differential expression
 When selecting differential expression, the list of phosphopeptides from the differential expression analysis are used for kinase activity inference. The options to perform the inference from differential expression analysis result are shown below:
@@ -399,7 +416,9 @@ knitr::include_graphics("images/Q_kinase_settings1.PNG")
 
 * **Statistic used for computing the kinase score**: Whether to compute the kinase score based of the t-statistic or logFC from the differential expression analysis.
 * **Number of top kinases in plot**: How many kinases in each direction to display in the plot.
+* **Number of permutations**: How many permutations should be done for calculating the null distribution.
 * **Highlight kinases with p-values under**: Kinases whose p-values are below this threshold will be highlighted.
+* **use FDR**: Whether the FDR should be used.
 
 The output is a table showing the kinases, the activity score, and (adjusted) p-values. Positive scores are highlighted pink while negative ones are highlighted blue. For kinases with the most positive or negative activity score (default 10), their scores are also plotted in a horizontal barplot. Kinases whose p-values under the threshold are colored red.
 ```{r}
@@ -415,13 +434,15 @@ knitr::include_graphics("images/Q_kinase_result2.PNG")
 
 ## Time-series clustering
 
-When selecting time-series clustering, the list of phosphopeptides in the selected cluster (in the **Time series clustering** tab) is used to infer kinase activity. In the next selection box, users should then choose to estimate either the kinase activity score, i.e. how active the kinases are, or how likely the kinases are associated with the cluster.
-```{r, out.width="300px"}
-knitr::include_graphics("images/Q_kinase_settings3.PNG")
-```
+When selecting time-series clustering, the list of phosphopeptides in the selected cluster (in the **Time series clustering** tab) is used to either infer the kinase activity score or how likely the kinases are associated with the cluster. These analyses will be explained in more details in the following 2 subsections.
 
 ### Estimating kinase activity score
-If users choose to estimate the kinase activity score, then the option to perform clustering specified in the **Time series clustering** tab affects the analysis being done. If the option **expression** was chosen, the fold-change in expression levels for consecutive time points would be used for the inference. Thus, the result would reflect how the kinase activity change over time. Below is an example of the result when performing the inference with 4 time points:
+For this part, users would need to define the number of permutations for calculating the null distribution.
+```{r, out.width="300px"}
+knitr::include_graphics("images/Q_kinase_settings2.PNG")
+```
+
+Then the option to perform clustering specified in the **Time series clustering** tab affects the analysis being done in this part. If the option **expression** was chosen, the fold-change in expression levels for consecutive time points would be used for the inference. Thus, the result would reflect how the kinase activity change over time. Below is an example of the result when performing the inference with 4 time points:
 ```{r}
 knitr::include_graphics("images/Q_kinase_result3.PNG")
 ```
@@ -445,13 +466,12 @@ knitr::include_graphics("images/Q_kinase_err1.PNG")
 ```
 
 ### Estimating kinase association
-In addition to kinase activity, users can choose to determine whether the kinases are associated with the selected cluster:
+In addition to kinase activity, users can choose to determine whether the kinases are associated with the selected cluster, using either the Fisher's exact test or the Fast Gene Set Enrichment Analysis algorithm (FGSEA). In FGSEA, the probability of each site to be in the cluster is used to rank the sites. Performing FGSEA is done by the decoupleR package (Badia-I-Mompel et al., 2022) and requires users to set the number of permutations for calculating the null distribution. Both methods use the kinase-phosphosite interaction network as their reference. Unlike the above part on estimating kinase activity, the choice of method for time series clustering in the **Time series clustering** tab does not affect the method in this part.
 ```{r, out.width="300px"}
-knitr::include_graphics("images/Q_kinase_settings2.PNG")
+knitr::include_graphics("images/Q_kinase_settings3.PNG")
 ```
-As of 3rd November 2023, only the Fisher's exact test has been implemented. The GSEA method will be implemented in the near future.
 
-The result for the Fisher's exact test is displayed in a table:
+The result for the Fisher's exact test is displayed in a table. Kinases whose (adjusted) p-values higher than the p-value threshold are excluded.
 ```{r}
 knitr::include_graphics("images/Q_kinase_result6.PNG")
 ```
@@ -459,7 +479,12 @@ knitr::include_graphics("images/Q_kinase_result6.PNG")
 * **number.pSite.in.cluster**: Number of phosphosites targeted by the kinase and are present in the cluster.
 * **number.pSite.by.kinase**: Number of all phosphosites known to be targeted by the kinase, as derived from the above-mentioned kinase-phosphosite network.
 * **p-value**: p-value from the test.
-* **padj**: adjusted p-value.
+* **padj**: adjusted p-value (FDR).
+
+The result for the FGSEA is also displayed in a table showing the enrichment score.
+```{r,out.width="300px"}
+knitr::include_graphics("images/Q_kinase_result6.5.PNG")
+```
 
 Clicking a kinase will open a table showing the phosphosites targeted by the kinase in the cluster.
 ```{r}
