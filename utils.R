@@ -784,12 +784,13 @@ getDecouplerNetwork <- function(speciesRef) {
 ## decoupler_network: Network of kinases and their targets derived from Omnipath
 ## corrThreshold: threshold to check for colinearity in the decoupler_network
 ## statType: is either "stat" or "log2FC"
+## nPerm: number of permutations for the null distribution
 # Output ---------------------------
 # A dataframe with 4 columns:
 ## source: name of the kinase
 ## score: inferred activity score of the kinase
 ## p_value: p-value from the decoupler::run_wmean function
-calcKinaseScore <- function(resTab, decoupler_network, corrThreshold = 0.9, statType = "stat") {
+calcKinaseScore <- function(resTab, decoupler_network, corrThreshold = 0.9, statType = "stat", nPerm = 100) {
   # get differential phosphorylation sites
   resTab <- resTab %>%
     distinct(site, .keep_all = TRUE) %>%
@@ -800,6 +801,7 @@ calcKinaseScore <- function(resTab, decoupler_network, corrThreshold = 0.9, stat
   } else if (statType == "log2FC") {
     inputTab <- resTab %>% select(site, log2FC) 
   }
+  rownames(inputTab) <- NULL
   inputTab <- inputTab %>% data.frame() %>% column_to_rownames("site")
   decoupler_network <- decoupleR::intersect_regulons(mat = inputTab, 
                                                      network = decoupler_network, 
@@ -807,13 +809,10 @@ calcKinaseScore <- function(resTab, decoupler_network, corrThreshold = 0.9, stat
                                                      .target = target, 
                                                      minsize = 5)
   # check for colinearity and remove interactions with correlation >= threshold
-  #correlated_regulons <- decoupleR::check_corr(decoupler_network) %>%  #not necessary for now
-  #  dplyr::filter(correlation >= corrThreshold)
-  #decoupler_network <- decoupler_network %>% 
-  #  dplyr::filter(!source %in% correlated_regulons$source.2)
-  # adjust the number of permutations to be 1/2 the number of phosphosites being evaluated 
-  nPerm <- round(nrow(inputTab)/2)
-  nPerm <- ifelse(nPerm <100, 100, nPerm)
+  correlated_regulons <- decoupleR::check_corr(decoupler_network) %>%  #not necessary for now
+    dplyr::filter(correlation >= corrThreshold)
+  decoupler_network <- decoupler_network %>% 
+    dplyr::filter(!source %in% correlated_regulons$source.2)
   # calculate the kinase score by computing the weighted mean
   kinase_activity <- decoupleR::run_wmean(mat = as.matrix(inputTab), 
                                           network = decoupler_network,
@@ -840,13 +839,13 @@ plotKinaseDE <- function(scoreTab, nTop = 10, pCut = 0.05) {
     group_by(score_sign) %>% slice_max(abs(score), n = nTop)
   p <- ggplot(plotTab, aes(x = reorder(source, score), y = score)) + 
     geom_bar(aes(fill = significance), stat = "identity") 
-  if (unique(plotTab$significance) == paste0("p > ",pCut)) {
-    p <- p + scale_fill_manual(values = "lightgrey", labels = paste0("p > ",pCut)) 
-  } else if (unique(plotTab$significance) == paste0("p <= ",pCut)) {
-    p <- p + scale_fill_manual(values = "indianred", labels = paste0("p <= ",pCut)) 
-  } else {
+  if (length(unique(plotTab$significance)) == 2) {
     p <- p + scale_fill_manual(values = c("indianred", "lightgrey"), labels = c(paste0("p <= ",pCut), paste0("p > ",pCut)))
-  }
+  } else if (unique(plotTab$significance) == paste0("p > ",pCut)) {
+    p <- p + scale_fill_manual(values = "lightgrey", labels = paste0("p > ",pCut)) 
+  } else if (unique(plotTab$significance) == c(paste0("p <= ",pCut))) {
+    p <- p + scale_fill_manual(values = "indianred", labels = paste0("p <= ",pCut)) 
+  } 
   p <- p + 
     theme_linedraw() +
     theme(axis.title = element_text(face = "bold", size = 15),
@@ -884,7 +883,7 @@ plotKinaseTimeSeries <- function(scoreTab, pCut = 0.05, clusterName = "cluster1"
     ylab("Kinase") + xlab("Time point") + ggtitle(paste("Kinase activity infererence,", clusterName)) + 
     theme(axis.title = element_text(face = "bold", size = 15),
           axis.text.y = element_text(size =15),
-          axis.text.x = element_text(size = 15),
+          axis.text.x = element_text(size = 15, angle = 45, vjust = 1, hjust = 1),
           plot.title = element_text(size = 17),
           legend.title = element_text(size =15, face= "bold"),
           legend.text = element_text(size =15),
