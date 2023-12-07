@@ -1,5 +1,7 @@
 .DS_Store
-rawFolder
+rawFolder*
 omnipathr-log
 testData
+.RData
+.Rhistory
 
