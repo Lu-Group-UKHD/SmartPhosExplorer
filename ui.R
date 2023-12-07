@@ -21,11 +21,9 @@ navbarPage("SmartPhos explorer",
            # or phosphoproteome assay. Options for choosing the transformation method,
            # normalization, and displaying the missing values. 
            tabPanel("Preprocesing",
+                    h5("Updated on 07.12.2023, please check the Update Notes panel for detailed information"),
                     h4(a("Instruction on how to use SmartPhosExplorer", 
                          href="https://www.huber.embl.de/users/jlu/smartPhos/vignette.html",
-                         target="_blank")),
-                    h4(a("Update notes",
-                         href="https://www.huber.embl.de/users/jlu/smartPhos/NEWS.html",  # Update this when changing the server
                          target="_blank")),
                     titlePanel("Data input and preprocessing"),
                     sidebarLayout(
@@ -376,4 +374,6 @@ navbarPage("SmartPhos explorer",
                                 uiOutput("downloadUI4")
                                 
                       ))),
+           tabPanel("Update Notes",
+                    includeMarkdown("./NEWS.md"))
 )
