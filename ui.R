@@ -24,6 +24,9 @@ navbarPage("SmartPhos explorer",
                     h4(a("Instruction on how to use SmartPhosExplorer", 
                          href="https://www.huber.embl.de/users/jlu/smartPhos/vignette.html",
                          target="_blank")),
+                    h4(a("Update notes",
+                         href="https://www.huber.embl.de/users/jlu/smartPhos/NEWS.html",  # Update this when changing the server
+                         target="_blank")),
                     titlePanel("Data input and preprocessing"),
                     sidebarLayout(
                       sidebarPanel(
