@@ -179,8 +179,9 @@ navbarPage("SmartPhos explorer",
            # and normalized assay from the first tab. The two methods available are
            # limma and ProDA. Users have options to filter the differentially expressed
            # genes table based on p-value and log fold change value. Box plot
-           # for the comparison can be done by simply clicking on the row. The user
-           # can download the DE table as a .tsv file. 
+           # for the comparison can be done by simply clicking on the row. There
+           # is Volcano plot also available for visualization. The user can download
+           # the DE table as a .tsv file.
            tabPanel("Differential expression",
                     titlePanel("Identify DE genes between treatments or time points"),
                     sidebarLayout(
@@ -200,12 +201,14 @@ navbarPage("SmartPhos explorer",
                         actionButton("runDE",label = "Run DE analysis"),
                         textInput("pFilter","p value cutoff", value = 0.05),
                         checkboxInput("ifAdjusted","Use adjusted p values", value = FALSE),
-                        textInput("fcFilter","log2FC coefficient cutoff", value = 0)
+                        textInput("fcFilter","log2FC coefficient cutoff", value = 0.5)
                       ),
                       mainPanel(
                         DT::dataTableOutput("DEtab"),
                         uiOutput("downloadTableUI"),
-                        uiOutput("ui.plot")
+                        fluidRow(
+                          splitLayout(cellWidths = c("60%", "40%"), uiOutput("ui.plot"), plotlyOutput("plotVolcano"))
+                        )
                       ))),
            
            # This tab performs clustering of time series gene expression patterns

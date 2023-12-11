@@ -743,7 +743,6 @@ shinyServer(function(input, output, session) {
         if (input$deMethod == "limma") {
           fit <- limma::lmFit(exprMat, design = design)
           fit2 <- eBayes(fit)
-          resNames <- colnames(design)
           resDE <- topTable(fit2, number = Inf, coef=resNames[length(resNames)])
           # get result
           meta <- as.data.frame(elementMetadata(processedDataSub()))
@@ -883,6 +882,33 @@ shinyServer(function(input, output, session) {
                 axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5, size = 15))
       }
     }
+  })
+  
+  # volcano plot
+  plotV <- reactive({
+    plot <- ggplot(tableDE(), aes(x = log2FC, y = -log10(pvalue), text = paste("gene:", Gene))) +
+      geom_vline(xintercept = 0, color = "black", linetype = "solid", size = 0.25) +
+      geom_vline(xintercept = as.numeric(input$fcFilter), color = "darkgrey", linetype = "dashed") +
+      geom_vline(xintercept = -as.numeric(input$fcFilter), color = "darkgrey", linetype = "dashed") +
+      geom_hline(yintercept = -log10(as.numeric(input$pFilter)), color = "darkgrey", linetype = "dashed") +  
+      annotate(x = 5.0, y = -log10(as.numeric(input$pFilter))-0.1, label = paste("P-value = ", as.numeric(input$pFilter)),
+               geom = "text", size = 3, color = "darkgrey") +
+      geom_hline(yintercept = -log10(0.25), color="darkgrey", linetype = "dashed") +  
+      annotate(x = 5.0, y = 0.5, label = paste("P-value = ", 0.25),
+               geom = "text", size=3, color="darkgrey") +
+      geom_point(data = tableDE()[tableDE()$log2FC >= as.numeric(input$fcFilter) & tableDE()$pvalue <= as.numeric(input$pFilter),],
+                 color="firebrick3", size = 0.9) +
+      geom_point(data = tableDE()[tableDE()$log2FC <= -as.numeric(input$fcFilter) & tableDE()$pvalue <= as.numeric(input$pFilter),],
+                 color="navy", size=0.9) +
+      geom_point(data = tableDE()[tableDE()$pvalue > as.numeric(input$pFilter),], color="darkgrey", size = 0.9) +
+      xlab("absolute log2(Quantity) difference") +
+      ggtitle("Volcano plot") +
+      theme(plot.title = element_text(hjust=0.5, face="bold"))
+    plot
+  })
+  
+  output$plotVolcano <- renderPlotly({
+    ggplotly(plotV())
   })
   
   #################################################### time series clustering ##################################################
