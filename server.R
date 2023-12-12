@@ -825,10 +825,10 @@ shinyServer(function(input, output, session) {
     if (!is.null(tableDE())) {
       #the size of the ui is depend on whether it's a histogram or a boxplot
       if(ifHistogram$value == TRUE) {
-        fig.width <- 700
+        fig.width <- 600
         fig.height <- 400
       } else {
-        fig.width <- 700
+        fig.width <- 600
         fig.height <- 500
       }
       plotlyOutput("plot1", width = paste0(fig.width,"px"),
@@ -900,10 +900,10 @@ shinyServer(function(input, output, session) {
                  color="firebrick3", size = 0.9) +
       geom_point(data = tableDE()[tableDE()$log2FC <= -as.numeric(input$fcFilter) & tableDE()$pvalue <= as.numeric(input$pFilter),],
                  color="navy", size=0.9) +
-      geom_point(data = tableDE()[tableDE()$pvalue > as.numeric(input$pFilter),], color="darkgrey", size = 0.9) +
+      geom_point(data = tableDE()[tableDE()$pvalue > as.numeric(input$pFilter) | (tableDE()$log2FC < as.numeric(input$fcFilter) & tableDE()$log2FC > -as.numeric(input$fcFilter)),], color="darkgrey", size = 0.9) +
       xlab("absolute log2(Quantity) difference") +
       ggtitle("Volcano plot") +
-      theme(plot.title = element_text(hjust=0.5, face="bold"))
+      theme(plot.title = element_text(hjust=0.5))
     plot
   })
   
