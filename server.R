@@ -720,11 +720,8 @@ shinyServer(function(input, output, session) {
   tableDE <- reactiveVal()
   # a reactive value to monitor if plot histogram or boxplot
   ifHistogram <- reactiveValues(value = TRUE)
-  
-  # if table is clicked, turn the ifHistogram to false
-  observeEvent(input$DEtab_row_last_clicked,{
-    ifHistogram$value <- FALSE
-  })
+  # a reactive value to save the clicked row or volcano plot point value
+  lastClicked <- reactiveValues()
   
   # reactive event for calculating differential expression
   observeEvent(input$runDE, {
@@ -820,6 +817,56 @@ shinyServer(function(input, output, session) {
     }
   )
   
+  # volcano plot
+  plotV <- reactive({
+    dataVolcano <- data.frame(tableDE())
+    dataVolcano$ID <- as.character(dataVolcano$ID)
+    plot <- ggplot(dataVolcano, aes(x = log2FC, y = -log10(pvalue), label = Gene, customdata = ID)) +
+      geom_vline(xintercept = 0, color = "black", linetype = "solid", size = 0.25) +
+      geom_vline(xintercept = as.numeric(input$fcFilter), color = "darkgrey", linetype = "dashed") +
+      geom_vline(xintercept = -as.numeric(input$fcFilter), color = "darkgrey", linetype = "dashed") +
+      geom_hline(yintercept = -log10(as.numeric(input$pFilter)), color = "darkgrey", linetype = "dashed") +  
+      annotate(x = 5.0, y = -log10(as.numeric(input$pFilter))-0.1, label = paste("P-value = ", as.numeric(input$pFilter)),
+               geom = "text", size = 3, color = "darkgrey") +
+      geom_hline(yintercept = -log10(0.25), color="darkgrey", linetype = "dashed") +  
+      annotate(x = 5.0, y = 0.5, label = paste("P-value = ", 0.25),
+               geom = "text", size=3, color="darkgrey") +
+      geom_point(data = dataVolcano[dataVolcano$log2FC >= as.numeric(input$fcFilter) & dataVolcano$pvalue <= as.numeric(input$pFilter),],
+                 color="firebrick3", size = 0.9) +
+      geom_point(data = dataVolcano[dataVolcano$log2FC <= -as.numeric(input$fcFilter) & dataVolcano$pvalue <= as.numeric(input$pFilter),],
+                 color="navy", size=0.9) +
+      geom_point(data = dataVolcano[dataVolcano$pvalue > as.numeric(input$pFilter) | (dataVolcano$log2FC < as.numeric(input$fcFilter) & dataVolcano$log2FC > -as.numeric(input$fcFilter)),], color="darkgrey", size = 0.9) +
+      xlab("absolute log2(Quantity) difference") +
+      ggtitle("Volcano plot") +
+      theme(plot.title = element_text(hjust=0.5))
+    plot
+  })
+  
+  output$plotVolcano <- renderPlotly({
+    p <- ggplotly(plotV(), source = "volcano") 
+    p %>%
+      layout(dragmode = "select") %>%
+      event_register("plotly_click")
+  })
+  
+  # observe event when a point in the volcano plot is clicked
+  observeEvent(event_data("plotly_click", source = "volcano"),{
+    # a point in the volcano plot is clicked, turn the ifHistogram to false
+    ifHistogram$value <- FALSE
+    d <- event_data("plotly_click", source = "volcano")
+    lastInfo <- d$customdata
+    lastClicked$geneID <- filterDE()[filterDE()$ID == lastInfo,]$ID
+    lastClicked$geneSymbol <- filterDE()[filterDE()$ID == lastInfo,]$Gene
+  })
+  # observe event when a row in the DE table is clicked
+  observeEvent(input$DEtab_row_last_clicked,{
+    # a row is clicked, turn the ifHistogram to false
+    ifHistogram$value <- FALSE
+    lastInfo <- input$DEtab_row_last_clicked
+    lastClicked$geneID <- filterDE()[lastInfo,]$ID
+    lastClicked$geneSymbol <- filterDE()[lastInfo,]$Gene
+  })
+  
   # a ui to hold the plot on the first panel
   output$ui.plot <- renderUI({
     if (!is.null(tableDE())) {
@@ -849,11 +896,8 @@ shinyServer(function(input, output, session) {
       }
       # Box-plot for comparison
       else {
-        lastClicked <- input$DEtab_row_last_clicked
-        geneID <- filterDE()[lastClicked,]$ID
-        if (input$assay == "Phosphoproteome")
-          geneSymbol <- filterDE()[lastClicked,]$site else
-            geneSymbol <- filterDE()[lastClicked,]$Gene
+        geneID <- lastClicked$geneID
+        geneSymbol <- lastClicked$geneSymbol
        
         seqMat <- processedDataSub()
         exprMat <- assays(seqMat)[["Intensity"]]
@@ -883,34 +927,6 @@ shinyServer(function(input, output, session) {
       }
     }
   })
-  
-  # volcano plot
-  plotV <- reactive({
-    plot <- ggplot(tableDE(), aes(x = log2FC, y = -log10(pvalue), text = paste("gene:", Gene))) +
-      geom_vline(xintercept = 0, color = "black", linetype = "solid", size = 0.25) +
-      geom_vline(xintercept = as.numeric(input$fcFilter), color = "darkgrey", linetype = "dashed") +
-      geom_vline(xintercept = -as.numeric(input$fcFilter), color = "darkgrey", linetype = "dashed") +
-      geom_hline(yintercept = -log10(as.numeric(input$pFilter)), color = "darkgrey", linetype = "dashed") +  
-      annotate(x = 5.0, y = -log10(as.numeric(input$pFilter))-0.1, label = paste("P-value = ", as.numeric(input$pFilter)),
-               geom = "text", size = 3, color = "darkgrey") +
-      geom_hline(yintercept = -log10(0.25), color="darkgrey", linetype = "dashed") +  
-      annotate(x = 5.0, y = 0.5, label = paste("P-value = ", 0.25),
-               geom = "text", size=3, color="darkgrey") +
-      geom_point(data = tableDE()[tableDE()$log2FC >= as.numeric(input$fcFilter) & tableDE()$pvalue <= as.numeric(input$pFilter),],
-                 color="firebrick3", size = 0.9) +
-      geom_point(data = tableDE()[tableDE()$log2FC <= -as.numeric(input$fcFilter) & tableDE()$pvalue <= as.numeric(input$pFilter),],
-                 color="navy", size=0.9) +
-      geom_point(data = tableDE()[tableDE()$pvalue > as.numeric(input$pFilter) | (tableDE()$log2FC < as.numeric(input$fcFilter) & tableDE()$log2FC > -as.numeric(input$fcFilter)),], color="darkgrey", size = 0.9) +
-      xlab("absolute log2(Quantity) difference") +
-      ggtitle("Volcano plot") +
-      theme(plot.title = element_text(hjust=0.5))
-    plot
-  })
-  
-  output$plotVolcano <- renderPlotly({
-    ggplotly(plotV())
-  })
-  
   #################################################### time series clustering ##################################################
   
   ####Widgets
