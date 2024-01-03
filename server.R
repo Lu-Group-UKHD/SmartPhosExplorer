@@ -737,12 +737,12 @@ shinyServer(function(input, output, session) {
           design <- model.matrix(~ subjectID + comparison, data = colData)
         }
         resNames <- colnames(design)
+        meta <- as.data.frame(elementMetadata(processedDataSub()))
         if (input$deMethod == "limma") {
           fit <- limma::lmFit(exprMat, design = design)
           fit2 <- eBayes(fit)
           resDE <- topTable(fit2, number = Inf, coef=resNames[length(resNames)])
           # get result
-          meta <- as.data.frame(elementMetadata(processedDataSub()))
           resDE <- merge(resDE, meta, by=0, all=TRUE)
           resDE <- as_tibble(resDE) %>%
             dplyr::rename(log2FC = logFC, stat = t,
@@ -755,7 +755,6 @@ shinyServer(function(input, output, session) {
           fit <- proDA::proDA(exprMat, design = design)
           resDE <- proDA::test_diff(fit, contrast = resNames[length(resNames)])
           # get result
-          meta <- as.data.frame(elementMetadata(processedDataSub()))
           rownames(resDE) <- resDE[,1]
           resDE[,1] <- NULL
           resDE <- merge(resDE, meta, by=0, all=TRUE)
@@ -856,7 +855,11 @@ shinyServer(function(input, output, session) {
     d <- event_data("plotly_click", source = "volcano")
     lastInfo <- d$customdata
     lastClicked$geneID <- filterDE()[filterDE()$ID == lastInfo,]$ID
-    lastClicked$geneSymbol <- filterDE()[filterDE()$ID == lastInfo,]$Gene
+    if (input$assay == "Phosphoproteome") {
+      lastClicked$geneSymbol <- filterDE()[filterDE()$ID == lastInfo,]$site
+    } else {
+      lastClicked$geneSymbol <- filterDE()[filterDE()$ID == lastInfo,]$Gene
+    }
   })
   # observe event when a row in the DE table is clicked
   observeEvent(input$DEtab_row_last_clicked,{
@@ -864,7 +867,11 @@ shinyServer(function(input, output, session) {
     ifHistogram$value <- FALSE
     lastInfo <- input$DEtab_row_last_clicked
     lastClicked$geneID <- filterDE()[lastInfo,]$ID
-    lastClicked$geneSymbol <- filterDE()[lastInfo,]$Gene
+    if (input$assay == "Phosphoproteome") {
+      lastClicked$geneSymbol <- filterDE()[lastInfo,]$site
+    } else {
+      lastClicked$geneSymbol <- filterDE()[lastInfo,]$Gene
+    }
   })
   
   # a ui to hold the plot on the first panel

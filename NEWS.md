@@ -1,5 +1,19 @@
 # SmartPhosExplorer update notes
 
+## Version: 1.0.2
+
+Date: 2024-01-03
+
+CHANGES IN VERSION 1.0.2
+
+------------------------------------------------
+
+Differential expression analysis: 
+
+* Introduce Volcano plot for the differential expression analysis result.
+* User can click on the coloured data points of the volcano plot to get the box plot. This box plot is same as the one generated when clicking on the row of DE table with same ID.
+
+-------------------------------------------------------
 
 ## Version: 1.0.1
 
