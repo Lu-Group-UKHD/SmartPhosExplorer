@@ -96,15 +96,12 @@ shinyServer(function(input, output, session) {
       tryCatch({
         # for data from Spectronaut
         if (input$tool == "Spectronaut") {
-          testData <- SmartPhos::readExperimentDIA(fileTable)
+          testData <- SmartPhos::readExperimentDIA(fileTable, annotation_col = input$colAnnoPreprocess)
         }
         # for data from MaxQuant
         else if (input$tool == "MaxQuant") {
-          testData <- SmartPhos::readExperiment(fileTable)
+          testData <- SmartPhos::readExperiment(fileTable, annotation_col = input$colAnnoPreprocess)
         }
-        cd <- colData(testData)
-        cd[input$colAnnoPreprocess] <- fileTable[input$colAnnoPreprocess]
-        colData(testData) <- cd
         mae(testData)
       },
       error = function(e) {
@@ -153,7 +150,7 @@ shinyServer(function(input, output, session) {
   # loaded object for boxplot and table
   loadedData <- reactive({
     se <- mae()[[input$assay]]
-    colData(se) <- colData(mae())
+    colData(se) <- colData(mae()[, colnames(se)])
     if (input$assay == "Phosphoproteome") {
       if (input$getFP) {
         ppe <- se[,se$sampleType == "FullProteome"]
@@ -244,7 +241,7 @@ shinyServer(function(input, output, session) {
       else maeData <- mae()
       # summarizedAssayExperiment object of the selected assay
       se <- maeData[[input$assay]]
-      colData(se) <- colData(maeData)
+      colData(se) <- colData(maeData[, colnames(se)])
       if (input$assay == "Proteome") {
         # function from the utils.R script for the preprocessing of the data
         fp <- preprocessProteome(se, filterList = NULL,
