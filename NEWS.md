@@ -2,13 +2,19 @@
 
 ## Version: 1.0.2
 
-Date: 2024-01-03
+Date: 2024-01-16
 
 CHANGES IN VERSION 1.0.2
 
 ------------------------------------------------
 
-Differential expression analysis: 
+Data preprocessing:  
+
+* SmartPhos app does not require the upload of complete proteomic and phosphoproteomic search of both enriched and un-enriched samples. For examples, users can upload only phospho search on the enriched samples or proteomic search on the unenriched samples for the analyses.   
+
+* A bug in normalization with log2 transformation has been fixed.   
+
+Differential expression analysis:    
 
 * Introduce Volcano plot for the differential expression analysis result.
 * User can click on the coloured data points of the volcano plot to get the box plot. This box plot is same as the one generated when clicking on the row of DE table with same ID.
