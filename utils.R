@@ -16,8 +16,10 @@ getOneSymbol <- function(Gene) {
 medianNorm <- function(x, method = "median") {
   if (method == "median") {
     mVal <- matrixStats::colMedians(x, na.rm=TRUE)
+    mVal <- mVal - median(mVal, na.rm=TRUE)
   } else if (method == "mean") {
     mVal <- colMeans(x, na.rm=TRUE)
+    mVal <- mVal - mean(mVal, na.rm=TRUE)
   }
   mMat <- matrix(rep(mVal, each = nrow(x)), ncol =ncol(x))
   return(x-mMat)
