@@ -719,6 +719,16 @@ shinyServer(function(input, output, session) {
   ifHistogram <- reactiveValues(value = TRUE)
   # a reactive value to save the clicked row or volcano plot point value
   lastClicked <- reactiveValues()
+  # a reactive value to sync the data table with the volcano plot selection
+  colorRows <- reactiveValues(
+    row_priority = c(),
+    row_color = c()
+  )
+  # a reactive value to highlight the point with row selection
+  ptHiglight <- reactiveValues(
+    log2FC = NULL,
+    pValue = NULL
+  )
   
   # reactive event for calculating differential expression
   observeEvent(input$runDE, {
@@ -792,10 +802,23 @@ shinyServer(function(input, output, session) {
   # table for differentially expressed genes
   output$DEtab <- DT::renderDataTable({
     if (!is.null(filterDE())) {
-      datatable(filterDE(),selection = 'single', rownames = FALSE,
-                caption = "Differentially expressed genes") %>%
-        formatRound(c('pvalue',"padj"),digits=3) %>%
-        formatRound(c('log2FC','stat'),digits=2)
+      if (!is.null(colorRows$row_color)) {
+        datatable(filterDE(), selection = 'single', rownames = FALSE,
+                  caption = "Differentially expressed genes") %>%
+          formatStyle("ID",
+                      target = "row",
+                      backgroundColor = styleEqual(colorRows$row_priority, 
+                                                   colorRows$row_color, 
+                                                   default = 'white')) %>%
+          formatRound(c('pvalue',"padj"),digits=3) %>%
+          formatRound(c('log2FC','stat'),digits=2)
+      }
+      else {
+        datatable(filterDE(), selection = 'single', rownames = FALSE,
+                  caption = "Differentially expressed genes") %>%
+          formatRound(c('pvalue',"padj"),digits=3) %>%
+          formatRound(c('log2FC','stat'),digits=2)
+      }
     }
   })
   
@@ -841,8 +864,13 @@ shinyServer(function(input, output, session) {
   output$plotVolcano <- renderPlotly({
     p <- ggplotly(plotV(), source = "volcano") 
     p %>%
-      layout(dragmode = "select") %>%
       event_register("plotly_click")
+    if (!is.null(ptHiglight$log2FC)) {
+      p <- add_trace(p, x = ptHiglight$log2FC, y = ptHiglight$pValue,
+                     type = "scatter", mode = 'markers',
+                     marker = list(size = 10, symbol = "star"))
+    }
+    p
   })
   
   # observe event when a point in the volcano plot is clicked
@@ -857,6 +885,11 @@ shinyServer(function(input, output, session) {
     } else {
       lastClicked$geneSymbol <- filterDE()[filterDE()$ID == lastInfo,]$Gene
     }
+    colorRows$row_priority <- filterDE()$ID
+    colorRows$row_priority <- c(lastClicked$geneID, colorRows$row_priority[colorRows$row_priority != lastClicked$geneID])
+    colorRows$row_color <- lapply(colorRows$row_priority, function(x) ifelse(x %in% lastClicked$geneID, "lightgreen", "white"))
+    ptHiglight$log2FC <- filterDE()[filterDE()$ID == lastInfo,]$log2FC
+    ptHiglight$pValue <- -log10(filterDE()[filterDE()$ID == lastInfo,]$pvalue)
   })
   # observe event when a row in the DE table is clicked
   observeEvent(input$DEtab_row_last_clicked,{
@@ -869,6 +902,10 @@ shinyServer(function(input, output, session) {
     } else {
       lastClicked$geneSymbol <- filterDE()[lastInfo,]$Gene
     }
+    ptHiglight$log2FC <- filterDE()[lastInfo,]$log2FC
+    ptHiglight$pValue <- -log10(filterDE()[lastInfo,]$pvalue)
+    colorRows$row_priority <- c(lastClicked$geneID, colorRows$row_priority[colorRows$row_priority != lastClicked$geneID])
+    colorRows$row_color <- lapply(colorRows$row_priority, function(x) ifelse(x %in% lastClicked$geneID, "lightgreen", "white"))
   })
   
   # a ui to hold the plot on the first panel
