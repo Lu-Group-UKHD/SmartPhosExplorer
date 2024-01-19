@@ -354,26 +354,21 @@ display: none;
 
 <div id="smartphosexplorer-update-notes" class="section level1">
 <h1>SmartPhosExplorer update notes</h1>
-<div id="version-1.0.3" class="section level2">
-<h2>Version: 1.0.3</h2>
-<p>Date: 2024-01-16</p>
-<p>CHANGES IN VERSION 1.0.3</p>
-<hr />
-<ul>
-<li>SmartPhos can now handle single assay also. For example, it can now
-work on just proteomics assay (provided the format of fileTable.txt file
-is correct).</li>
-<li>Ability to work on unbalanced data, so it is not mandatory to
-perform proteomic and phosphoproteomic searches on both enriched and
-non-enriched samples.</li>
-</ul>
-<hr />
-</div>
 <div id="version-1.0.2" class="section level2">
 <h2>Version: 1.0.2</h2>
-<p>Date: 2024-01-03</p>
+<p>Date: 2024-01-16</p>
 <p>CHANGES IN VERSION 1.0.2</p>
 <hr />
+<p>Data preprocessing:</p>
+<ul>
+<li><p>SmartPhos app does not require the upload of complete proteomic
+and phosphoproteomic search of both enriched and un-enriched samples.
+For examples, users can upload only phospho search on the enriched
+samples or proteomic search on the unenriched samples for the
+analyses.</p></li>
+<li><p>A bug in normalization with log2 transformation has been
+fixed.</p></li>
+</ul>
 <p>Differential expression analysis:</p>
 <ul>
 <li>Introduce Volcano plot for the differential expression analysis
