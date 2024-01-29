@@ -18,6 +18,9 @@ shinyServer(function(input, output, session) {
   # a reactive value to store the saved list
   saveList <- reactiveValues(file = list.files("save/"))
   
+  # a reactive values variable to store the value of all inputs
+  inputsValue <- reactiveValues()
+  
   # a box showing saved results
   output$saveListBox <- renderUI({
     selectInput("seleFile", label = NULL, saveList$file, size = 5, selectize = FALSE)
@@ -47,6 +50,7 @@ shinyServer(function(input, output, session) {
   
   # zip file
   observeEvent(input$uploadZip, {
+    inputsValue$upload <- input$upload
     # removing the already existing directory before unzipping
     unlink(outDir, recursive = TRUE)
     dir.create(outDir, showWarnings = FALSE)
@@ -94,6 +98,7 @@ shinyServer(function(input, output, session) {
       fileTable$fileName <- file.path(outDir, fileTable$fileName) #outDir is a variable
       
       tryCatch({
+        inputsValue$tool <- input$tool
         # for data from Spectronaut
         if (input$tool == "Spectronaut") {
           testData <- SmartPhos::readExperimentDIA(fileTable, annotation_col = input$colAnnoPreprocess)
@@ -116,6 +121,7 @@ shinyServer(function(input, output, session) {
   
   # read the uploaded object
   observeEvent(input$uploadObject, {
+    inputsValue$upload <- input$upload
     file <- input$uploadObject
     ext <- tools::file_ext(file$datapath)
     req(file)
@@ -134,6 +140,7 @@ shinyServer(function(input, output, session) {
   # rendering options for the phospho-enriched or non-enriched sample type 
   output$seleAssayBox <- renderUI({
     if (!is.null(mae())) {
+      inputsValue$assay <- input$assay
       if (input$assay == "Proteome") {
         radioButtons("getPP", "Select the sample type",
                      c("Phospho-enriched" = TRUE, "Non-enriched" = FALSE),
@@ -152,6 +159,7 @@ shinyServer(function(input, output, session) {
     se <- mae()[[input$assay]]
     colData(se) <- colData(mae()[, colnames(se)])
     if (input$assay == "Phosphoproteome") {
+      inputsValue$getFP <- input$getFP
       if (input$getFP) {
         ppe <- se[,se$sampleType == "FullProteome"]
         colData(ppe) <- colData(se)[colnames(ppe),]
@@ -163,6 +171,7 @@ shinyServer(function(input, output, session) {
       ppe
     }
     else if (input$assay == "Proteome") {
+      inputsValue$getPP <- input$getPP
       if (input$getPP) {
         fpe <- se[,se$sampleType == "Phospho"]
         colData(fpe) <- colData(se)[colnames(fpe),]
@@ -219,6 +228,7 @@ shinyServer(function(input, output, session) {
       # first step, whether to perform phospho normalization correction, if phospho data is selected.    
       if (input$assay == "Phosphoproteome") {
         if (input$ifNormCorrect) {
+          inputsValue$ifNormCorrect <- input$ifNormCorrect
           maeData <- runPhosphoAdjustment(mae(), 
                                           normalization = ifelse(input$ifAlreadyNorm == "Yes", FALSE, TRUE), #depends on whether the data were already normalized
                                           minOverlap = 3, #at least three overlapped feature between sample pair
@@ -265,6 +275,11 @@ shinyServer(function(input, output, session) {
                              scaleFactorTab = NULL)
         processedData(pp)
       }
+      inputsValue$transform <- input$transform
+      inputsValue$normalize <- input$normalize
+      inputsValue$missFilter <- input$missFilter
+      inputsValue$outliers <- input$outliers
+      inputsValue$impute <- input$impute
     })
   })
   
@@ -350,6 +365,7 @@ shinyServer(function(input, output, session) {
       g <- g + geom_boxplot()
     }
     else {
+      inputsValue$colorBox <- input$colorBox
       g <- g + geom_boxplot(aes_string(fill = input$colorBox))
     }
     g
@@ -401,6 +417,10 @@ shinyServer(function(input, output, session) {
                              meta, by = c("rowname" = "sample"))
         
         plotpc <- reactive({
+          inputsValue$xaxisPCA <- input$xaxisPCA
+          inputsValue$yaxisPCA <- input$yaxisPCA
+          inputsValue$colorPCA <- input$colorPCA
+          inputsValue$shapePCA <- input$shapePCA
           g <- ggplot(pcaMeta, aes(x = !!sym(input$xaxisPCA), y = !!sym(input$yaxisPCA),
                                    text = paste("sample:", meta$sample))) +
             theme_bw() +
@@ -488,7 +508,9 @@ shinyServer(function(input, output, session) {
   plotMap <- eventReactive(input$doPlot, {
     
     if (input$chooseType == "Top variant") {
+      inputsValue$chooseType <- input$chooseType
       # plot top variant genes
+      inputsValue$numGenes <- input$numGenes
       setName <- sprintf("Top %s most variant genes", input$numGenes)
       geneIDs <- orderID()[seq(1, as.integer(input$numGenes))]
       exprMat <- assays(processedData())[["imputed"]][geneIDs,]
@@ -497,6 +519,7 @@ shinyServer(function(input, output, session) {
     else if (input$chooseType == "Differentially expressed") {
       # plot differentially expressed genes
       if(!is.null(filterDE())) {
+        inputsValue$chooseType <- input$chooseType
         setName <- "Differentially expressed genes"
         # prepare the data matrix
         geneIDs <- arrange(filterDE(), stat)$ID
@@ -515,6 +538,8 @@ shinyServer(function(input, output, session) {
     else if (input$chooseType == "Selected time series cluster") {
       # plot genes from the selected cluster
       if(!is.null(selectedCluster())) {
+        inputsValue$chooseType <- input$chooseType
+        inputsValue$seleCluster <- input$seleCluster
         setName <- input$seleCluster
         # prepare the data matrix
         geneIDs <- unique(selectedCluster()$ID)
@@ -547,6 +572,8 @@ shinyServer(function(input, output, session) {
     
     # plot heatmap
     if (input$chooseType == "Top variant") {
+      inputsValue$numClustCol <- input$numClustCol
+      inputsValue$numClustRow <- input$numClustRow
       if (is.null(input$colAnnoHM)) {
         p <- pheatmap(exprMat, color = color,
                       labels_row = geneSymbol,
@@ -557,6 +584,7 @@ shinyServer(function(input, output, session) {
                       silient = TRUE)
       }
       else {
+        inputsValue$colAnnoHM <- input$colAnnoHM
         p <- pheatmap(exprMat, color = color,
                       labels_row = geneSymbol,
                       treeheight_row = 0, treeheight_col = 0,
@@ -581,6 +609,7 @@ shinyServer(function(input, output, session) {
                       silient = TRUE)
       }
       else {
+        inputsValue$colAnnoHM <- input$colAnnoHM
         p <- pheatmap(exprMat, color = color,
                       labels_row = geneSymbol,
                       treeheight_row = 0, treeheight_col = 0,
@@ -667,26 +696,42 @@ shinyServer(function(input, output, session) {
   # List of sample ID for reference group
   listIDforDE1 <- reactive(
     if (input$seleID) {
+      inputsValue$seleID1 <- input$seleID1
       selectedID <- input$seleID1
       selectedID
-    } else {
-      if (!is.null(processedData()$timepoint))
-        selectedID <- processedData()[,processedData()$treatment %in% input$seleTreat1 & processedData()$timepoint %in% input$seleTime1]$sample else
-          selectedID <-processedData()[,processedData()$treatment %in% input$seleTreat1]$sample
-        selectedID
+    } 
+    else {
+      if (!is.null(processedData()$timepoint)) {
+        inputsValue$Treat1 <- input$seleTreat1
+        inputsValue$Time1 <- input$seleTime1
+        selectedID <- processedData()[,processedData()$treatment %in% input$seleTreat1 & processedData()$timepoint %in% input$seleTime1]$sample
+      }
+      else {
+        inputsValue$Treat1 <- input$seleTreat1
+        selectedID <-processedData()[,processedData()$treatment %in% input$seleTreat1]$sample
+      }
+      selectedID
     }
   )
   
   # List of sample ID for target group
   listIDforDE2 <- reactive(
     if (input$seleID) {
+      inputsValue$seleID2 <- input$seleID2
       selectedID <- input$seleID2
       selectedID
-    } else {
-      if (!is.null(processedData()$timepoint))
-        selectedID <- processedData()[,processedData()$treatment %in% input$seleTreat2 & processedData()$timepoint %in% input$seleTime2]$sample else
-          selectedID <- processedData()[,processedData()$treatment %in% input$seleTreat2]$sample
-        selectedID
+    } 
+    else {
+      if (!is.null(processedData()$timepoint)) {
+        inputsValue$Treat2 <- input$seleTreat2
+        inputsValue$Time2 <- input$seleTime2
+        selectedID <- processedData()[,processedData()$treatment %in% input$seleTreat2 & processedData()$timepoint %in% input$seleTime2]$sample
+      }
+      else {
+        inputsValue$Treat2 <- input$seleTreat2
+        selectedID <- processedData()[,processedData()$treatment %in% input$seleTreat2]$sample
+      }
+      selectedID
     }
   )
   
@@ -746,6 +791,7 @@ shinyServer(function(input, output, session) {
         resNames <- colnames(design)
         meta <- as.data.frame(elementMetadata(processedDataSub()))
         if (input$deMethod == "limma") {
+          inputsValue$deMethod <- input$deMethod
           fit <- limma::lmFit(exprMat, design = design)
           fit2 <- eBayes(fit)
           resDE <- topTable(fit2, number = Inf, coef=resNames[length(resNames)])
@@ -759,6 +805,7 @@ shinyServer(function(input, output, session) {
             arrange(pvalue)
         }
         else if (input$deMethod == "ProDA") {
+          inputsValue$deMethod <- input$deMethod
           fit <- proDA::proDA(exprMat, design = design)
           resDE <- proDA::test_diff(fit, contrast = resNames[length(resNames)])
           # get result
@@ -791,10 +838,13 @@ shinyServer(function(input, output, session) {
     if (!is.null(tableDE())) {
       DEtab <- tableDE()
       if(input$ifAdjusted) {
+        inputsValue$ifAdjusted <- input$ifAdjusted
         DEtab <- filter(DEtab, abs(log2FC) >= input$fcFilter, padj <= as.numeric(input$pFilter))
       } else {
         DEtab <- filter(DEtab, abs(log2FC) >= input$fcFilter, pvalue <= as.numeric(input$pFilter))
       }
+      inputsValue$fcFilter <- input$fcFilter
+      inputsValue$pFilter <- input$pFilter
       DEtab
     }
   })
@@ -937,6 +987,8 @@ shinyServer(function(input, output, session) {
       }
       # Box-plot for comparison
       else {
+        inputsValue$geneID <- lastClicked$geneID
+        inputsValue$geneSymbol <- lastClicked$geneSymbol
         geneID <- lastClicked$geneID
         geneSymbol <- lastClicked$geneSymbol
        
@@ -2256,5 +2308,31 @@ shinyServer(function(input, output, session) {
       write.csv2(pSiteList(), file)
     }
   )
+  
+  ############################################## log info ##############################################
+  
+  infoTable <- read.delim(file = 'infoTable.tsv', sep = '\t')
+  
+  allInputs <- reactive({
+    values <- reactiveValuesToList(inputsValue)
+    df <- lapply(names(values), function(n) {
+      v <- paste0(unlist(values[n]), collapse = ",")
+      data.frame(name = n, value = v) 
+    }) %>% bind_rows() 
+    df <- left_join(df, infoTable, by = "name")
+  })
+  
+  
+  
+  output$show_inputs <- renderDataTable({
+    datatable(allInputs(), filter = "top", rownames = FALSE,
+              selection = "none", style = "bootstrap")
+  })
+  
+  output$downloadLogValues <- downloadHandler(
+    filename = function() { paste('Logvalues', '.tsv', sep='') },
+    content = function(file) {
+      write.table(allInputs(), file = file, quote = FALSE, sep = '\t', col.names = NA)
+    })
   
 })

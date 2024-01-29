@@ -1,0 +1,35 @@
+name	panel	description
+upload	Preprocessing	type of upload: a zip file or an R object
+tool	Preprocessing	tool used to process the raw MS files: Spectronaut or MaxQuant
+assay	Preprocessing	selects the type of assay: phosphoproteomic or proteomic
+getFP	Preprocessing	if the samples are enriched or non-enriched
+getPP	Preprocessing	if the samples are enriched or non-enriched
+ifNormCorrect	Preprocessing	apply the normalization correction method (only applicable for phosphoproteomics data)
+transform	Preprocessing	select the tranformation method
+normalize	Preprocessing	if normalization is desired or not
+missFilter	Preprocessing	percentage of missing values allowed
+outliers	Preprocessing	list of all the sample outliers to be removed for further analysis/exploration
+impute	Preprocessing	select the imputation method
+colorBox	Preprocessing	color the box-plot based on the selected annotation
+xaxisPCA	PCA	principal component on x-axis
+yaxisPCA	PCA	principal component on y-axis
+colorPCA	PCA	color the points based on the selected annotation
+shapePCA	PCA	shape the points based on the selected annotation
+chooseType	Heatmap	select the type of heatmap: most-variant genes, differentially expressed genes or genes from cluster
+numGenes	Heatmap	number of top-variant genes
+seleCluster	Heatmap	selected cluster number
+numClustCol	Heatmap	number of custers, the columns of the heatmap should be divided into
+numClustRow	Heatmap	number of clusters, the rows of the heatmap should be divided into
+colAnnoHM	Heatmap	additional column annotations for the heatmap
+seleID1	Differential expression	reference group ID(s)
+Treat1	Differential expression	reference treatment condition(s)
+Time1	Differential expression	reference timepoint(s)
+seleID2	Differential expression	target group ID(s)
+Treat2	Differential expression	target treatment condition(s)
+Time2	Differential expression	target timepoint(s)
+deMethod	Differential expression	select differential expression method: limma or ProDA
+ifAdjusted	Differential expression	if adjusted pValue should be used for filtering
+fcFilter	Differential expression	log fold-change value for filtering
+pFilter	Differential expression	p value for filtering
+geneID	Differential expression	last clicked gene ID
+geneSymbol	Differential expression	last clicked gene symbol

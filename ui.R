@@ -377,6 +377,18 @@ navbarPage("SmartPhos explorer",
                                 uiOutput("downloadUI4")
                                 
                       ))),
+           
+           # This tab displays the information about all the selections and inputs 
+           # by the user. It also allows to download all the log information in a 
+           # text/tsv file.
+           tabPanel("Log Info",
+                    titlePanel("Log information of the inputs and selections"),
+                    mainPanel(downloadButton('downloadLogValues', 'Download log values'),
+                              hr(),
+                              DT::dataTableOutput("show_inputs"))
+           ),
+           
+           # This tab displays the update notes of the SmartPhos explorer app.
            tabPanel("Update Notes",
                     includeMarkdown("./NEWS.md"))
 )
