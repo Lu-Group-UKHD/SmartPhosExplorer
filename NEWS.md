@@ -1,5 +1,25 @@
 # SmartPhosExplorer update notes
 
+## Version: 1.0.3
+
+Date: 2024-01-30
+
+CHANGES IN VERSION 1.0.3
+
+------------------------------------------------
+
+Log Info:  
+
+* Log info tab is added to the SmartPhos explorer app to keep track of all the user inputs.
+* All the log info can be download as a TSV file.
+
+Differential expression analysis:    
+
+* Volcano plot is made interactive. When the user clicks on the row of differential expression genes table, the corresponding point on volcano plot is highlighted as a star symbol.
+* Also, when user click on any colored point on volcano plot, the point turns into star and the corresponding row in the table is highlighted. 
+
+-------------------------------------------------------
+
 ## Version: 1.0.2
 
 Date: 2024-01-16
