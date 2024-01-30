@@ -539,7 +539,7 @@ shinyServer(function(input, output, session) {
       # plot genes from the selected cluster
       if(!is.null(selectedCluster())) {
         inputsValue$chooseType <- input$chooseType
-        inputsValue$seleCluster <- input$seleCluster
+        inputsValue$seleClusterHM <- input$seleCluster
         setName <- input$seleCluster
         # prepare the data matrix
         geneIDs <- unique(selectedCluster()$ID)
@@ -987,8 +987,8 @@ shinyServer(function(input, output, session) {
       }
       # Box-plot for comparison
       else {
-        inputsValue$geneID <- lastClicked$geneID
-        inputsValue$geneSymbol <- lastClicked$geneSymbol
+        inputsValue$geneID_DE <- lastClicked$geneID
+        inputsValue$geneSymbol_DE <- lastClicked$geneSymbol
         geneID <- lastClicked$geneID
         geneSymbol <- lastClicked$geneSymbol
        
@@ -1099,11 +1099,17 @@ shinyServer(function(input, output, session) {
   exprMatObj <- reactive({
     # Processing with selecting expression (i.e. only 1 condition)
     if (input$clusterFor == "expression") {
+      inputsValue$clusterFor <- input$clusterFor
+      inputsValue$seleTreat_cluster <- input$seleTreat_cluster
+      inputsValue$seleTimeRange <- input$seleTimeRange
       processedDataSub <- processedData()[, processedData()$treatment == input$seleTreat_cluster & 
                                   processedData()$timepoint %in% input$seleTimeRange]
       assayMat <- assay(processedDataSub)
+      inputsValue$ifFilterFit <- input$ifFilterFit
       # Filtering genes with p values from the spline fit test
       if (input$ifFilterFit) {
+        inputsValue$pSpline <- input$pSpline
+        inputsValue$ifSplineFdr <- input$ifSplineFdr
         if (!is.null(processedDataSub$subjectID)) {
           assayMat <- splineFilter(assayMat, subjectID = processedDataSub$subjectID,
                                    time = processedDataSub$timepoint,
@@ -1126,7 +1132,9 @@ shinyServer(function(input, output, session) {
       rownames(exprMat) <- rownames(processedDataSub)
       colnames(exprMat) <- unique(processedDataSub$timepoint)
       
-    } else if (input$clusterFor == "logFC") {
+    } 
+    else if (input$clusterFor == "logFC") {
+      inputsValue$clusterFor <- input$clusterFor
       processedDataSub <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
                                   processedData()$timepoint %in% input$seleTimeRange]
       processedDataRef <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & 
@@ -1152,8 +1160,10 @@ shinyServer(function(input, output, session) {
       RefMat <- assay(processedDataRef)
       
       #  calculate fold change per matching sample first, apply spline filter, THEN calculate the mean logFC per time point
-      
+      inputsValue$ifFilterFit <- input$ifFilterFit
       if (input$ifFilterFit) {
+        inputsValue$pSpline <- input$pSpline
+        inputsValue$ifSplineFdr <- input$ifSplineFdr
         fcMat <- assayMat - RefMat
         if (!is.null(processedDataSub$subjectID)) {
           fcMat <- splineFilter(fcMat, subjectID = processedDataSub$subjectID,
@@ -1187,11 +1197,17 @@ shinyServer(function(input, output, session) {
       rownames(exprMat) <- rownames(processedDataSub)
       colnames(exprMat) <- unique(processedDataSub$timepoint)
       
-    } else if (input$clusterFor == "two-condition expression") {
+    } 
+    else if (input$clusterFor == "two-condition expression") {
+      inputsValue$clusterFor <- input$clusterFor
+      inputsValue$seleTreat_clusterRef <- input$seleTreat_clusterRef
       processedDataSub <- processedData()[,processedData()$treatment %in% c(input$seleTreat_cluster, input$seleTreat_clusterRef) & 
                                   processedData()$timepoint %in% input$seleTimeRange]
       assayMat <- assay(processedDataSub)
+      inputsValue$ifFilterFit <- input$ifFilterFit
       if (input$ifFilterFit) {
+        inputsValue$pSpline <- input$pSpline
+        inputsValue$ifSplineFdr <- input$ifSplineFdr
         if (!is.null(processedDataSub$subjectID)) {
           assayMat <- splineFilter(assayMat, subjectID = processedDataSub$subjectID,
                                    time = processedDataSub$timepoint,
@@ -1222,6 +1238,7 @@ shinyServer(function(input, output, session) {
     # filter based on variance 
     sds <- apply(exprMat,1,sd)
     varPer <- as.numeric(input$topVarTime)
+    inputsValue$topVarTime <- input$topVarTime
     exprMat <- exprMat[order(sds, decreasing = TRUE)[seq(1, varPer/100*nrow(exprMat))], ]
     
     # only center when it's for expression
@@ -1252,10 +1269,13 @@ shinyServer(function(input, output, session) {
     withProgress(message = "Performing cmeans clustering, please wait...", {
       # plot clustering result and error check
       tryCatch({
-        if (input$clusterFor != "two-condition expression")
-        {clusterRes <- clusterTS(exprMatObj(),
-                                 as.numeric(input$seleNumCluster),
-                                 pCut = as.numeric(input$seleProbCut))}
+        inputsValue$seleNumCluster <- input$seleNumCluster
+        inputsValue$seleProbCut <- input$seleProbCut
+        if (input$clusterFor != "two-condition expression") {
+          clusterRes <- clusterTS(exprMatObj(),
+                                  as.numeric(input$seleNumCluster),
+                                  pCut = as.numeric(input$seleProbCut))
+        }
         else {
           clusterRes <- clusterTS(exprMatObj(),
                                   as.numeric(input$seleNumCluster),
@@ -1288,7 +1308,9 @@ shinyServer(function(input, output, session) {
   selectedCluster <- reactive({
     if (is.null(clusterTabVal())) {
       NULL 
-    } else {
+    } 
+    else {
+      inputsValue$seleCluster <- input$seleCluster
       selectedTab <- filter(clusterTabVal(), cluster == input$seleCluster) %>% 
         distinct(feature, .keep_all = TRUE) %>%
         mutate(feature = as.character(feature)) 
@@ -1345,9 +1367,13 @@ shinyServer(function(input, output, session) {
     lastClicked <- input$eachClusterTab_row_last_clicked
     if (!is.null(lastClicked)) {
       geneID <- selectedCluster()[lastClicked,]$ID
-      if (input$assay == "Phosphoproteome")
-        geneSymbol <- selectedCluster()[lastClicked,]$site else
-          geneSymbol <- selectedCluster()[lastClicked,]$Gene
+      if (input$assay == "Phosphoproteome") {
+        geneSymbol <- selectedCluster()[lastClicked,]$site
+      } else {
+        geneSymbol <- selectedCluster()[lastClicked,]$Gene
+      }
+      inputsValue$geneIDclust <- geneID
+      inputsValue$geneSymbolclust <- geneSymbol
       
       if (input$clusterFor == "expression") {
         seqMat <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
@@ -1434,31 +1460,36 @@ shinyServer(function(input, output, session) {
   # assay is selected (might change in the future!)
   resGSEA <- observeEvent(input$RunEnrich, {
     if ((input$seleSourceEnrich == "Differential expression") & (input$analysisMethod == "Pathway enrichment" || input$assay == "Proteome")) {
-      ################################################################
-      ####### Pathway enrichment for differential expression #########
-      ################################################################
+      # Pathway enrichment for differential expression 
       if (!is.null(filterDE())) {
         output$errMsg <- renderText("")
         withProgress(message = "Running enrichment analysis, please wait...", {
           # set color list to empty
           colorList$cols <- NULL
           # reading geneset database
+          inputsValue$sigSet <- input$sigSet
           inGMT <- loadGSC(paste0("geneset/",input$sigSet),type="gmt")
           # method
+          inputsValue$enrichMethod <- input$enrichMethod
           gseMethod <- input$enrichMethod
           # parameters for GSEA
-          if (gseMethod == "GSEA") nPerm <- input$permNum
+          if (gseMethod == "GSEA") {
+            nPerm <- input$permNum
+            inputsValue$permNum <- input$permNum
+          } 
           # processing differential expression
           corTab <- filterDE() %>%
             arrange(pvalue) %>%
             filter(!duplicated(Gene)) %>%
             arrange(stat)
           # gene level statistics based on user input
+          inputsValue$statType <- input$statType
           if(input$statType == "stat") {
             myCoef <- data.frame(row.names = corTab$Gene,
                                  stat = corTab$stat,
                                  stringsAsFactors = FALSE)
-          } else {
+          }
+          else {
             myCoef <- data.frame(row.names = corTab$Gene,
                                  stat = corTab$log2FC,
                                  stringsAsFactors = FALSE)
@@ -1470,7 +1501,8 @@ shinyServer(function(input, output, session) {
                           adjMethod = "fdr",
                           gsc = inGMT,
                           signifMethod = 'nullDist')
-          } else if (gseMethod == "GSEA") {
+          } 
+          else if (gseMethod == "GSEA") {
             res <- runGSA(geneLevelStats = myCoef,
                           geneSetStat = "gsea",
                           adjMethod = "fdr",
@@ -1511,10 +1543,9 @@ shinyServer(function(input, output, session) {
       } else {
         output$errMsg <- renderText("Please perform differential expression analysis first or load a previous result!")
       }
-    } else if ((input$seleSourceEnrich =="Time series cluster") & (input$analysisMethod =="Pathway enrichment" || input$assay == "Proteome")) {
-      ################################################################
-      ######### Pathway enrichment for time series cluster ###########
-      ################################################################
+    } 
+    else if ((input$seleSourceEnrich =="Time series cluster") & (input$analysisMethod =="Pathway enrichment" || input$assay == "Proteome")) {
+      # Pathway enrichment for time series cluster 
       if (!is.null(selectedCluster())) {
         output$errMsg <- renderText("")
         withProgress(message = "Running enrichment analysis, please wait...", {
@@ -1526,6 +1557,7 @@ shinyServer(function(input, output, session) {
           # Applying the Fisher's exact test with the runFisher function from utils.
           # Other enrichment methods can be added here
           if (input$enrichMethod1 == "Fisher's exact test")
+            inputsValue$enrichMethod1 <- input$enrichMethod1
             resTab <- runFisher(unique(selectedCluster()$Gene),
                                 reference = unique(rowData(processedData())$Gene),
                                 gmtFile = paste0("geneset/", input$sigSet)) %>%
@@ -1555,10 +1587,9 @@ shinyServer(function(input, output, session) {
       } else {
         output$errMsg <- renderText("Please perform time series clustering first!")
       }
-    } else if ((input$seleSourceEnrich == "Differential expression") & (input$analysisMethod == "Phospho-signature enrichment")){
-      ################################################################
-      ### Phospho-signature enrichment for differential expression ###
-      ################################################################
+    } 
+    else if ((input$seleSourceEnrich == "Differential expression") & (input$analysisMethod == "Phospho-signature enrichment")){
+      # Phospho-signature enrichment for differential expression 
       if ((!is.null(filterDE())) & (input$assay == "Phosphoproteome")) {
         output$errMsg <- renderText("")
         withProgress(message = "Running enrichment analysis, please wait...", {
@@ -1578,9 +1609,11 @@ shinyServer(function(input, output, session) {
                                  stringsAsFactors = FALSE)
           }
           # retrieve the phosphodatabase
+          inputsValue$sigSetPTM <- input$sigSetPTM
           ptmSetDb <- read.table(paste0("ptmset/", input$sigSetPTM), header = TRUE, sep = "\t",stringsAsFactors = FALSE)
           
           # perform GSEA
+          inputsValue$permNum <- input$permNum
           resTab <- runGSEAforPhospho(geneStat = myCoef, ptmSetDb = ptmSetDb, nPerm =  input$permNum,
                                       weight = 1, correl.type = "rank", statistic = "Kolmogorov-Smirnov", min.overlap = 5) %>%
             as.data.frame()
@@ -1614,16 +1647,16 @@ shinyServer(function(input, output, session) {
           clickRecord$gene <- FALSE
         })
       } else output$errMsg <- renderText("Please perform differential expression analysis first and make sure you have selected the Phosphoproteome assay!")
-    } else if ((input$seleSourceEnrich == "Time series cluster") & (input$analysisMethod == "Phospho-signature enrichment")) {
-      ################################################################
-      ### Phospho-signature enrichment for Time-series clustering ####
-      ################################################################
+    } 
+    else if ((input$seleSourceEnrich == "Time series cluster") & (input$analysisMethod == "Phospho-signature enrichment")) {
+      # Phospho-signature enrichment for Time-series clustering 
       if ((!is.null(selectedCluster())) & (input$assay == "Phosphoproteome")) {
         output$errMsg <- renderText("")
         withProgress(message = "Running enrichment analysis, please wait...", {
           # set color list to empty
           colorList$cols <- NULL
           # Run the Fisher's exact test for sites in the cluster
+          inputsValue$sigSetPTM <- input$sigSetPTM
           resTab <- runFisher(genes = selectedCluster()$site,
                               reference = rowData(processedData())$site,
                               gmtFile = paste0("ptmset/", input$sigSetPTM),
@@ -1659,6 +1692,10 @@ shinyServer(function(input, output, session) {
   output$enrichTab <- DT::renderDataTable({
     
     if( !is.null (GSEres$resTab)) {
+      inputsValue$seleSourceEnrich <- input$seleSourceEnrich
+      inputsValue$analysisMethod <- input$analysisMethod
+      inputsValue$ifEnrichFDR <- input$ifEnrichFDR
+      inputsValue$sigLevel <- input$sigLevel
       resTab <- GSEres$resTab 
       
       if (input$seleSourceEnrich == "Differential expression") {
@@ -1729,7 +1766,8 @@ shinyServer(function(input, output, session) {
     setName <- GSEres$resTab[as.integer(input$enrichTab_row_last_clicked), "Name"]
     if (input$assay == "Proteome" | input$analysisMethod == "Pathway enrichment") {
       geneList <- loadGSC(paste0("geneset/", input$sigSet), type = "gmt")$gsc[[setName]]
-    } else {
+    } 
+    else {
       geneList <- read.table(paste0("ptmset/", input$sigSetPTM), header = T, sep = "\t", stringsAsFactors = F) 
       if (input$seleSourceEnrich == "Time series cluster")
         geneList <- geneList %>% mutate(signature = ifelse(site.direction == "u", paste0(signature,"_upregulated"), paste0(signature, "_downregulated")))
@@ -1745,7 +1783,8 @@ shinyServer(function(input, output, session) {
         geneTab <- corGene[corGene$Gene %in% geneList,]
         # setNum is the number of gene sets containing the gene in question
         geneTab$setNum <- sapply(geneTab$Gene, function(x) length(setGene()[[x]]))
-      } else {
+      } 
+      else {
         geneTab <- corGene[corGene$site %in% geneList$site,]
         geneTab <- merge(x = geneTab, y = geneList[,c("site","site.direction","PubMedID")], by = "site", all.x = TRUE)
         # only select sites whose direction of regulation (up- or down-regulated) matches with the database
@@ -1753,7 +1792,8 @@ shinyServer(function(input, output, session) {
         geneTab$setNum <- sapply(geneTab$site, function(x) length(setGene()[[x]]))
       }
       geneTab <- select(geneTab, any_of(c("site", "Gene","log2FC", "pvalue", "padj", "setNum", "Sequence", "PubMedID", "ID")))
-    } else {
+    } 
+    else {
       # time series cluster
       corGene <- selectedCluster()
       if (input$analysisMethod == "Pathway enrichment" | input$assay == "Proteome") {
@@ -1799,9 +1839,11 @@ shinyServer(function(input, output, session) {
     if (clickRecord$gene) {
       lastClicked <- input$geneTab_row_last_clicked
       geneID <- gseaList()[lastClicked,]$ID
+      inputsValue$geneIDenrich <- geneID
       if (input$assay == "Phosphoproteome")
         geneSymbol <- gseaList()[lastClicked,]$site else
           geneSymbol <- gseaList()[lastClicked,]$Gene
+      inputsValue$geneSymbolenrich <- geneSymbol
       
       if (!is.null(lastClicked)) {
         
@@ -1991,6 +2033,7 @@ shinyServer(function(input, output, session) {
   # reactive variable to store the decoupler network (update itself if change organism)
   decoupler_network <- reactive({
     network <- getDecouplerNetwork(input$speciesRef)
+    inputsValue$speciesRef <- input$speciesRef
     network
   })
   # reactive variable to store the kinase activity result
@@ -2000,12 +2043,15 @@ shinyServer(function(input, output, session) {
   runKinaseAnalysis <- observeEvent(input$runKinase, {
     if (input$assay == "Phosphoproteome") {
       if (input$seleSourceKinase == "Differential expression") {
+        inputsValue$seleSourceKinase <- input$seleSourceKinase
         if (!is.null(filterDE())) {
           withProgress(message = "Running kinase activity inference, please wait...", {
             output$errMsgKinase <- renderText("")
             # compute the kinase score or report error (usually because the selected organism was not correct)
             tryCatch({
               scoreTab <- calcKinaseScore(filterDE(), decoupler_network(), statType = input$statTypeKinase, nPerm = input$nPermKinase)
+              inputsValue$statTypeKinase <- input$statTypeKinase
+              inputsValue$nPermKinase <- input$nPermKinase
               scoreTab <- scoreTab %>% mutate(padj = p.adjust(p_value, method = "BH")) %>% arrange(p_value)
               kinaseRes(scoreTab)
             }, error = function(e) {
@@ -2026,6 +2072,7 @@ shinyServer(function(input, output, session) {
             # Add a column showing phosphosites based on the ID
             clusterData <- clusterTabVal() 
             clusterData <- clusterData[clusterData$cluster == input$seleCluster,]
+            inputsValue$seleClusterKinase <- input$seleCluster
             allClusterFeature <- clusterData %>% distinct(feature, .keep_all = TRUE) %>% .$feature
             allClusterSite <- data.frame(rowData(processedData())[allClusterFeature, "site"])
             allClusterSite$feature <- allClusterFeature
@@ -2033,11 +2080,13 @@ shinyServer(function(input, output, session) {
               left_join(allClusterSite, by = "feature") %>%
               rename(site = "rowData.processedData....allClusterFeature...site..")
             if (input$seleKinaseTimeMethod == "activity") {
+              inputsValue$seleKinaseTimeMethod <- input$seleKinaseTimeMethod
               # compute the kinase ACTIVITY score
               # initiate an empty dataframe to store score result
               scoreTab <- data.frame(source = c(), score = c(), p_value = c(), timepoint = c())
               # get the order of time points
               timeVector <- input$seleTimeRange
+              inputsValue$seleTimeRangeKinase <- input$seleTimeRange
               timeUnit <- suppressWarnings(str_extract(timeVector, "h|min"))
               timeUnit <- ifelse(is.na(timeUnit), "", timeUnit)
               # If both h and min are present, divide the min time points by 60
@@ -2076,6 +2125,8 @@ shinyServer(function(input, output, session) {
                     }
                     clusterDataTime <- na.omit(clusterDataTime)
                     scoreTabTime <- calcKinaseScore(clusterDataTime, decoupler_network(),statType = "log2FC", nPerm = input$nPermKinase)
+                    inputsValue$nPermKinase <- input$nPermKinase
+                    inputsValue$statTypeKinase <- input$statTypeKinase
                     scoreTabTime$timepoint <- paste0(time2,"_",time1)
                     timeOrder <- append(timeOrder, paste0(time2,"_",time1))
                     scoreTab <- rbind(scoreTab, scoreTabTime)
@@ -2088,6 +2139,8 @@ shinyServer(function(input, output, session) {
                     clusterDataTime <- clusterData[clusterData$time == time,] %>%
                       select(value, site) %>% rename(log2FC = "value")
                     scoreTabTime <- calcKinaseScore(clusterDataTime, decoupler_network(), statType = "log2FC", nPerm = input$nPermKinase)
+                    inputsValue$statTypeKinase <- input$statTypeKinase
+                    inputsValue$nPermKinase <- input$nPermKinase
                     scoreTabTime$timepoint <- time
                     scoreTab <- rbind(scoreTab, scoreTabTime)
                   }
@@ -2116,6 +2169,8 @@ shinyServer(function(input, output, session) {
                     }
                     clusterDataTime <- na.omit(clusterDataTime)
                     scoreTabTime <- calcKinaseScore(clusterDataTime, decoupler_network(), statType = "log2FC", nPerm = input$nPermKinase)
+                    inputsValue$statTypeKinase <- input$statTypeKinase
+                    inputsValue$nPermKinase <- input$nPermKinase
                     scoreTabTime$timepoint <- time
                     scoreTab <- rbind(scoreTab, scoreTabTime)
                   }
@@ -2134,66 +2189,71 @@ shinyServer(function(input, output, session) {
                   footer = NULL
                 ))})
             } else {
+              inputsValue$seleKinaseTimeMethod <- input$seleKinaseTimeMethod
               # compute how likely the kinases are associated with the cluster
               # An error is induced if no kinase is found (wrong organism or list too small)
               tryCatch({
-              if (input$seleAssoMethod == "Fisher's exact test") {
-                # Fisher's exact test to test kinase association with cluster
-                pSiteCluster  <- unique(selectedCluster()$site)
-                pSiteRefList <- unique(rowData(processedData())$site)
-                pSiteRefList <- pSiteRefList[!pSiteRefList %in% pSiteCluster]
-                rtab <- lapply(unique(decoupler_network()$source), function(kinase) {
-                  kinaseTarget = as.character(decoupler_network()[decoupler_network()$source == kinase,"target"])
-                  RinSet = sum(pSiteRefList %in% kinaseTarget)
-                  RninSet = length(pSiteRefList) - RinSet
-                  GinSet = sum(pSiteCluster %in% kinaseTarget)
-                  GninSet = length(pSiteCluster) - GinSet
-                  fmat = matrix(c(GinSet, RinSet, GninSet, RninSet), nrow = 2,
-                                ncol = 2, byrow = F)
-                  colnames(fmat) = c("inSet", "ninSet")
-                  rownames(fmat) = c("genes", "reference")
-                  fish = fisher.test(fmat, alternative = "greater")
-                  pval = fish$p.value
-                  inSet = RinSet + GinSet
-                  tibble(source = kinase,
-                         `number.pSite.in.cluster`= GinSet, 
-                         `number.pSite.by.kinase` = inSet, 
-                         p_value = pval)
-                }) %>% bind_rows() %>%
-                  filter(number.pSite.in.cluster>0) 
-              } else { # i.e. if seleAssoMethod == 'FGSEA'
-                # GSEA to test kinase association with cluster using FGSEA from decoupleR
-                # Data is taken from clusterTabVal() instead of selectedCluster() since
-                # the former has unrounded probability values
-                selectedTab <- filter(clusterTabVal(), cluster == input$seleCluster) %>% 
-                  distinct(feature, .keep_all = TRUE) %>%
-                  mutate(feature = as.character(feature)) 
-                clusterData <- rowData(processedData()[selectedTab$feature,])
-                inputTab <- selectedTab %>%
-                  mutate(site = clusterData$site) %>%
-                  select(site, prob) %>%
-                  column_to_rownames(var = "site") %>%
-                  arrange(desc(prob))
-                rtab <- decoupleR::run_fgsea(mat = inputTab,
+                inputsValue$seleAssoMethod <- input$seleAssoMethod
+                if (input$seleAssoMethod == "Fisher's exact test") {
+                  # Fisher's exact test to test kinase association with cluster
+                  pSiteCluster  <- unique(selectedCluster()$site)
+                  pSiteRefList <- unique(rowData(processedData())$site)
+                  pSiteRefList <- pSiteRefList[!pSiteRefList %in% pSiteCluster]
+                  rtab <- lapply(unique(decoupler_network()$source), function(kinase) {
+                    kinaseTarget = as.character(decoupler_network()[decoupler_network()$source == kinase,"target"])
+                    RinSet = sum(pSiteRefList %in% kinaseTarget)
+                    RninSet = length(pSiteRefList) - RinSet
+                    GinSet = sum(pSiteCluster %in% kinaseTarget)
+                    GninSet = length(pSiteCluster) - GinSet
+                    fmat = matrix(c(GinSet, RinSet, GninSet, RninSet), nrow = 2,
+                                  ncol = 2, byrow = F)
+                    colnames(fmat) = c("inSet", "ninSet")
+                    rownames(fmat) = c("genes", "reference")
+                    fish = fisher.test(fmat, alternative = "greater")
+                    pval = fish$p.value
+                    inSet = RinSet + GinSet
+                    tibble(source = kinase,
+                           `number.pSite.in.cluster`= GinSet, 
+                           `number.pSite.by.kinase` = inSet, 
+                           p_value = pval)
+                  }) %>% bind_rows() %>%
+                    filter(number.pSite.in.cluster>0) 
+                } else { # i.e. if seleAssoMethod == 'FGSEA'
+                  # GSEA to test kinase association with cluster using FGSEA from decoupleR
+                  # Data is taken from clusterTabVal() instead of selectedCluster() since
+                  # the former has unrounded probability values
+                  selectedTab <- filter(clusterTabVal(), cluster == input$seleCluster) %>% 
+                    distinct(feature, .keep_all = TRUE) %>%
+                    mutate(feature = as.character(feature)) 
+                  clusterData <- rowData(processedData()[selectedTab$feature,])
+                  inputTab <- selectedTab %>%
+                    mutate(site = clusterData$site) %>%
+                    select(site, prob) %>%
+                    column_to_rownames(var = "site") %>%
+                    arrange(desc(prob))
+                  rtab <- decoupleR::run_fgsea(mat = inputTab,
                                                network = decoupler_network(),
                                                minsize = 1,
-                                             times = input$nPermKinase) %>%
-                  filter(statistic == "fgsea") %>%
-                  select(-condition, -statistic) %>%
-                  rename(enrich.score = "score")
-              }
-            # adjusting p-values and filtering based on (adjusted) p-values
-            rtab <- rtab %>% 
-              mutate(padj = p.adjust(p_value, method = "BH")) %>%
-              arrange(p_value)
-            if (input$ifKinaseFDR)
-              rtab <- rtab %>% filter(padj <= input$pKinase) else
-                rtab <- rtab %>% filter(p_value <= input$pKinase)
-            # if no kinase: induce an error to show the pop-up window
-            if (nrow(rtab) == 0)
-              stop("No kinase found... perhaps the wrong organism was chosen or the p-value threshold was too low") else
-                kinaseRes(as.data.frame(rtab))
-            }, error = function(e) {
+                                               times = input$nPermKinase) %>%
+                    filter(statistic == "fgsea") %>%
+                    select(-condition, -statistic) %>%
+                    rename(enrich.score = "score")
+                  inputsValue$nPermKinase <- input$nPermKinase
+                }
+                # adjusting p-values and filtering based on (adjusted) p-values
+                rtab <- rtab %>% 
+                  mutate(padj = p.adjust(p_value, method = "BH")) %>%
+                  arrange(p_value)
+                if (input$ifKinaseFDR)
+                  rtab <- rtab %>% filter(padj <= input$pKinase) else
+                    rtab <- rtab %>% filter(p_value <= input$pKinase)
+                inputsValue$ifKinaseFDR <- input$ifKinaseFDR
+                inputsValue$pKinase <- input$pKinase
+                # if no kinase: induce an error to show the pop-up window
+                if (nrow(rtab) == 0)
+                  stop("No kinase found... perhaps the wrong organism was chosen or the p-value threshold was too low") else
+                    kinaseRes(as.data.frame(rtab))
+              }, error = function(e) {
                 kinaseRes(NULL)
                 showModal(modalDialog(
                   title = "No kinase found...",
@@ -2206,6 +2266,7 @@ shinyServer(function(input, output, session) {
         } else output$errMsgKinase <- renderText("Please do a time-series clustering (logFC) first")
       }}  else output$errMsgKinase <- renderText("This feature only support phosphoproteome data. Please double check the Preprocessing step!")
   })
+  
   # output to display plot object
   output$plotKinase <- renderPlot({
     if (!is.null(kinaseRes())) {
@@ -2255,6 +2316,7 @@ shinyServer(function(input, output, session) {
   pSiteList <- reactive({
     kinase <- as.character(kinaseRes()[as.integer(input$kinaseTab_row_last_clicked), "source"])
     pSite <- as.character(decoupler_network()[decoupler_network()$source == kinase, "target"])
+    inputsValue$kinaseLastClicked <- kinase
     if (input$seleSourceKinase == "Differential expression") 
       pSiteTab <- filterDE()[filterDE()$site %in% pSite,] else 
         pSiteTab <- selectedCluster()[selectedCluster()$site %in% pSite,]
