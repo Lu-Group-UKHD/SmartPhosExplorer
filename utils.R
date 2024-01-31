@@ -284,8 +284,15 @@ preprocessProteome <- function(seData, filterList = NULL, missCut = 50,
     colData(fpe) <- colData(seData)[colnames(fpe),]
   }
   
-  if (!is.null(removeOutlier)) {
-    fpe <- fpe[, !fpe$sample %in% removeOutlier]
+  if (length(removeOutlier) > 0) {
+    if (length(removeOutlier) > 1) {
+      for (i in removeOutlier) {
+        fpe <- fpe[, !grepl(i, fpe$sample)]
+      }
+    }
+    else {
+      fpe <- fpe[, !grepl(removeOutlier, fpe$sample)]
+    }
   }
   
   # filter for selected criteria
@@ -397,8 +404,15 @@ preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
     colData(ppe) <- colData(seData[,colnames(ppe)])
   }
   
-  if (!is.null(removeOutlier)) {
-    ppe <- ppe[, !ppe$sample %in% removeOutlier]
+  if (length(removeOutlier) > 0) {
+    if (length(removeOutlier) > 1) {
+      for (i in removeOutlier) {
+        ppe <- ppe[, !grepl(i, ppe$sample)]
+      }
+    }
+    else {
+      ppe <- ppe[, !grepl(removeOutlier, ppe$sample)]
+    }
   }
   
   # filter for selected criteria
