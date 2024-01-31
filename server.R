@@ -1135,6 +1135,8 @@ shinyServer(function(input, output, session) {
     } 
     else if (input$clusterFor == "logFC") {
       inputsValue$clusterFor <- input$clusterFor
+      inputsValue$seleTreat_cluster <- input$seleTreat_cluster
+      inputsValue$seleTimeRange <- input$seleTimeRange
       processedDataSub <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
                                   processedData()$timepoint %in% input$seleTimeRange]
       processedDataRef <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & 
@@ -1200,7 +1202,9 @@ shinyServer(function(input, output, session) {
     } 
     else if (input$clusterFor == "two-condition expression") {
       inputsValue$clusterFor <- input$clusterFor
+      inputsValue$seleTreat_cluster <- input$seleTreat_cluster
       inputsValue$seleTreat_clusterRef <- input$seleTreat_clusterRef
+      inputsValue$seleTimeRange <- input$seleTimeRange
       processedDataSub <- processedData()[,processedData()$treatment %in% c(input$seleTreat_cluster, input$seleTreat_clusterRef) & 
                                   processedData()$timepoint %in% input$seleTimeRange]
       assayMat <- assay(processedDataSub)
