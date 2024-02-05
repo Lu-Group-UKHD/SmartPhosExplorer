@@ -1,7 +1,7 @@
 ---
 title: "SmartPhos Explorer: a ShinyApp pipeline for processing and analysing phosphoproteomics data"
 author: "Shubham Agrawal, Cong Quan Ta"
-date: "2023-11-06"
+date: "2024-02-05"
 output:
   BiocStyle::html_document:
     toc_float: true
@@ -32,6 +32,8 @@ The current tabs are:
 * Time-series clustering
 * Enrichment analysis
 * Kinase activity inference
+* Log Info
+* Update Notes
 
 The vignette will go through the different tabs of the shiny app and explains how each of the functionalities work.
 
@@ -71,6 +73,8 @@ Here is an example of the fileTable.txt file:
 knitr::include_graphics("images/3.png")
 ```
 
+**NOTE**: It's better to not have any special characters ('(', ')', '#', '%', '@', etc) in the column names of the mass spec files by Spectronaut/MaxQuant and same for the ID column of the fileTable.txt file. This can sometimes cause error in the reading of the data and creating the proper multiAssayExperiment object.
+
 ### Column annotations
 
 User have option to select the column annotations when using the zip file method. If the upload of zip file is successful, another widget will appear which will allow the user to select from the different available annotation options. Multiple selections are possible simply by clicking on the list item. 
@@ -107,6 +111,7 @@ knitr::include_graphics("images/error3.png")
 
 SmartPhos package performs some pre-filtering and preprocessing based on various threshold values during the generation of the multiAssayExperiment object. On top of that, this panel has different options for preprocessing of the selected assay. The options provided by the shiny app are as follows:
 
+* **Normalization correction**: This option is present only if the phophoproteomics data is present. It allows for the correction of normalization artefacts introduced by the Spectronaut. 
 * **Transformation**: The transformation methods available are: log2 and vst (variance stabilizing transformation).
 * **Normalization**: Normalization strategy depends on the selected transformation method. Therefore, the user has option of *Yes* or *No*. If the user selects *Yes*, then for log2 and no transformation, *median scaling* is applied and for vst, *vsn* is applied. 
 * **Missing values**: Users can select what percentage of missing values are allowed. Proteins with missing values above the selected threshold will be removed from all analyses.
@@ -237,24 +242,22 @@ knitr::include_graphics("images/Q_DE_option1.PNG")
 knitr::include_graphics("images/Q_DE_option2.PNG")
 ```
 
-The output of differential expression analysis is a table which contains the differentially expressed genes arranged by the lowest p-values. The other information present in the table are: Uniprot ID, log2 fold change, t-statistic, adjusted p-value and some information if the data is phosphoproteomic data. The histogram of p-value is also plotted. 
+The output of differential expression analysis is a table which contains the differentially expressed genes arranged by the lowest p-values. The other information present in the table are: Uniprot ID, log2 fold change, t-statistic, adjusted p-value and some information if the data is phosphoproteomic data. A volcano plot is also plotted, highlighing the points with positive and negative log fold-change and above certain p value. The histogram of p-value is also plotted. 
 
 ```{r}
-knitr::include_graphics("images/DEtable.png")
+knitr::include_graphics("images/DE.png")
 ```
 
-```{r, out.width="400px"}
-knitr::include_graphics("images/pvalueHist.png")
-```
-
-Users have options to filter the differentially expressed genes table based on p-value and log fold change value. There is also an option of using adjusted p-value instead. Box plot for the comparison can be done by simply clicking on the row. The user can download the DE table as a TSV file. 
+Users have options to filter the differentially expressed genes table based on p-value and log fold change value. There is also an option of using adjusted p-value instead.
 
 ```{r, out.width="300px"}
-knitr::include_graphics("images/18.png")
+knitr::include_graphics("images/DE_filter.png")
 ```
 
+If the user click on the row of the differential expression table, the corresponding point in the volcano plot is highlighted as star. Moreover, a box plot is plot to show the change in normalized intensities for the selected conditions. Also, if the user click on any coloured point in the volcano plot, the corresponding row in the differential expression table is highlighted. The user also has the option to download the differential expression table as a TSV file.
+
 ```{r}
-knitr::include_graphics("images/DEboxplot.png")
+knitr::include_graphics("images/DE_click.png")
 ```
 
 In case the differential expression analysis is not possible for the selected settings, an error message will appear. 
@@ -490,6 +493,20 @@ Clicking a kinase will open a table showing the phosphosites targeted by the kin
 ```{r}
 knitr::include_graphics("images/Q_kinase_result7.PNG")
 ```
+
+# Log Info
+
+This tab displays the information about the user inputs. All the settings selected by the user are displayed in a table and can be downloaded as a TSV file. The table contains the following columns:
+
+* **name**: name of the input (usually the widget ID used in the shiny app script).
+* **value**: the value associated with the name. This is the actual user input.
+* **panel**: the tab panel in the shiny app to which this value belongs.
+* **description**: a short description about that particular setting.
+
+```{r}
+knitr::include_graphics("images/log_info.PNG")
+```
+
 
 # References
 Badia-I-Mompel, P., Santiago, J. V., Braunger, J., Geiß, C., Dimitrov, D., Müller‐Dott, S., Tauš, P., Dugourd, A., Holland, C. H., Flores, R. O. R., & Sáez-Rodríguez, J. (2022). decoupleR: ensemble of computational methods to infer biological activities from omics data. Bioinformatics Advances, 2(1). https://doi.org/10.1093/bioadv/vbac016
