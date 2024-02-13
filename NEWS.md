@@ -2,7 +2,7 @@
 
 ## Version: 1.0.3
 
-Date: 2024-01-30
+Date: 2024-02-13
 
 CHANGES IN VERSION 1.0.3
 
@@ -17,6 +17,10 @@ Differential expression analysis:
 
 * Volcano plot is made interactive. When the user clicks on the row of differential expression genes table, the corresponding point on volcano plot is highlighted as a star symbol.
 * Also, when user click on any colored point on volcano plot, the point turns into star and the corresponding row in the table is highlighted. 
+
+Preprocessing:
+
+* User can subset data using the filtering options present on the top of the table being displayed. 
 
 -------------------------------------------------------
 

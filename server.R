@@ -314,9 +314,11 @@ shinyServer(function(input, output, session) {
   
   # Reactive object for getting filtered samples
   processedData <- reactive({
-    selectedRows <- as.character(data.frame(colData(processedDataUF()))[input$metaData_rows_all,] %>% pull(sample))
-    dataNew <- processedDataUF()[, selectedRows]
-    dataNew
+    if(!is.null(processedDataUF())) {
+      selectedRows <- as.character(data.frame(colData(processedDataUF()))[input$metaData_rows_all,] %>% pull(sample))
+      dataNew <- processedDataUF()[, selectedRows]
+      dataNew
+    }
   })
 
   # Plot missing value
@@ -383,7 +385,6 @@ shinyServer(function(input, output, session) {
   ############################################## PCA ########################################################
   
   runPCA <- observeEvent(input$RunPCA, {
-    
     if ("imputed" %in% assayNames(processedData())) {
       output$errMsgPCA <- renderText("")
       withProgress(message = "Running principal component analysis, please wait...", {
