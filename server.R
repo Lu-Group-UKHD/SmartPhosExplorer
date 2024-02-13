@@ -12,6 +12,9 @@ shinyServer(function(input, output, session) {
   # a reactive val to store the multiassayexperiment object
   mae <- reactiveVal()
   
+  # a reactive variable to stored the processed and unfiltered assay
+  processedDataUF <- reactiveVal()
+  
   # a reactive variable to stored the processed assay
   processedData <- reactiveVal()
 
@@ -262,7 +265,7 @@ shinyServer(function(input, output, session) {
                                  removeOutlier = strsplit(input$outliers, ",\\s*")[[1]],
                                  impute = input$impute,
                                  scaleFactorTab = NULL)
-        processedData(fp)
+        processedDataUF(fp)
       }
       else {
         pp <- preprocessPhos(se, filterList = NULL,
@@ -273,7 +276,7 @@ shinyServer(function(input, output, session) {
                              removeOutlier = strsplit(input$outliers, ",\\s*")[[1]],
                              impute = input$impute,
                              scaleFactorTab = NULL)
-        processedData(pp)
+        processedDataUF(pp)
       }
       inputsValue$transform <- input$transform
       inputsValue$normalize <- input$normalize
@@ -285,9 +288,9 @@ shinyServer(function(input, output, session) {
   
   # text output to show the number of samples and features
   output$dataInfo <- renderUI({
-    if (!is.null(processedData())) {
+    if (!is.null(processedDataUF())) {
       HTML(sprintf("<b>Number of samples: %s<br/>Number of features: %s<b><br/>",
-                   ncol(processedData()), nrow(processedData())))
+                   ncol(processedDataUF()), nrow(processedDataUF())))
     }
     else {
       HTML(sprintf("<b>Number of samples: %s<br/>Number of features: %s<b><br/>",
@@ -297,8 +300,8 @@ shinyServer(function(input, output, session) {
   
   # data table
   output$metaData <- DT::renderDataTable({
-    if (!is.null(processedData())) {
-      colDataTable <- mutate_if(data.frame(colData(processedData())), is.character, as.factor)
+    if (!is.null(processedDataUF())) {
+      colDataTable <- mutate_if(data.frame(colData(processedDataUF())), is.character, as.factor)
       datatable(colDataTable, filter = "top", rownames = FALSE,
                 selection = "none", style = "bootstrap")
     }
@@ -307,7 +310,13 @@ shinyServer(function(input, output, session) {
       datatable(colDataTable, filter = "top", rownames = FALSE,
                 selection = "none", style = "bootstrap")
     }
-    
+  })
+  
+  # Reactive object for getting filtered samples
+  processedData <- reactive({
+    selectedRows <- as.character(data.frame(colData(processedDataUF()))[input$metaData_rows_all,] %>% pull(sample))
+    dataNew <- processedDataUF()[, selectedRows]
+    dataNew
   })
 
   # Plot missing value
@@ -342,12 +351,12 @@ shinyServer(function(input, output, session) {
   
   # Plot boxplot
   output$boxPlot <- renderPlot({
-    if (!is.null(processedData())) {
-      countMat <- assay(processedData())
+    if (!is.null(processedDataUF())) {
+      countMat <- assay(processedDataUF())
       countTab <- countMat %>% as_tibble(rownames = "id") %>% 
         pivot_longer(-id) %>%
         filter(!is.na(value))
-      meta <- as.data.frame(colData(processedData()))
+      meta <- as.data.frame(colData(processedDataUF()))
     }
     else {
       countMat <- assay(loadedData())
