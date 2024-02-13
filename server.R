@@ -115,7 +115,7 @@ shinyServer(function(input, output, session) {
       error = function(e) {
         showModal(modalDialog(
           title = "Processing of the uploaded data failed...",
-          "Please make sure the correct option for the tool (Spectronaut or MaxQuant) is selected.",
+          "Contact the SmartPhos package developers as there might me some issue with the SmartPhos package.",
           easyClose = TRUE,
           footer = NULL
         ))})
@@ -383,6 +383,12 @@ shinyServer(function(input, output, session) {
   })
   
   ############################################## PCA ########################################################
+  
+  output$messagePCA <- renderText({
+    if (is.null(processedData())) {
+      "Make sure to press the process button inside the preprocessing options panel before proceeding."
+    }
+  })
   
   runPCA <- observeEvent(input$RunPCA, {
     if ("imputed" %in% assayNames(processedData())) {

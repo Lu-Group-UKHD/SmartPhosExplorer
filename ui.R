@@ -142,6 +142,7 @@ navbarPage("SmartPhos explorer",
                         downloadButton("downPCA", "Download")
                       ),
                       mainPanel(
+                        span(textOutput("messagePCA"), style = "color:red; font-size:20px"),
                         plotlyOutput("pcplot", height = 800, width = 1000)
                     ))),
            
