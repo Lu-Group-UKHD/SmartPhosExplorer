@@ -906,6 +906,7 @@ shinyServer(function(input, output, session) {
   plotV <- reactive({
     dataVolcano <- data.frame(tableDE())
     dataVolcano$ID <- as.character(dataVolcano$ID)
+    # customdata is used for finding the actual data when a user click on a volcano plot point
     plot <- ggplot(dataVolcano, aes(x = log2FC, y = -log10(pvalue), label = Gene, customdata = ID)) +
       geom_vline(xintercept = 0, color = "black", linetype = "solid", size = 0.25) +
       geom_vline(xintercept = as.numeric(input$fcFilter), color = "darkgrey", linetype = "dashed") +
@@ -932,6 +933,8 @@ shinyServer(function(input, output, session) {
     p %>%
       event_register("plotly_click")
     if (!is.null(ptHiglight$log2FC)) {
+      # highlight the point selected either by clicking on the data table row or
+      # by clicking on a point on the volcano plot
       p <- add_trace(p, x = ptHiglight$log2FC, y = ptHiglight$pValue,
                      type = "scatter", mode = 'markers',
                      marker = list(size = 10, symbol = "star"))
@@ -947,8 +950,10 @@ shinyServer(function(input, output, session) {
     lastInfo <- d$customdata
     lastClicked$geneID <- filterDE()[filterDE()$ID == lastInfo,]$ID
     if (input$assay == "Phosphoproteome") {
+      # site contains the information of the gene, residue and site position information
       lastClicked$geneSymbol <- filterDE()[filterDE()$ID == lastInfo,]$site
-    } else {
+    }
+    else {
       lastClicked$geneSymbol <- filterDE()[filterDE()$ID == lastInfo,]$Gene
     }
     colorRows$row_priority <- filterDE()$ID
@@ -965,7 +970,8 @@ shinyServer(function(input, output, session) {
     lastClicked$geneID <- filterDE()[lastInfo,]$ID
     if (input$assay == "Phosphoproteome") {
       lastClicked$geneSymbol <- filterDE()[lastInfo,]$site
-    } else {
+    }
+    else {
       lastClicked$geneSymbol <- filterDE()[lastInfo,]$Gene
     }
     ptHiglight$log2FC <- filterDE()[lastInfo,]$log2FC
@@ -1003,10 +1009,8 @@ shinyServer(function(input, output, session) {
       }
       # Box-plot for comparison
       else {
-        inputsValue$geneID_DE <- lastClicked$geneID
-        inputsValue$geneSymbol_DE <- lastClicked$geneSymbol
-        geneID <- lastClicked$geneID
-        geneSymbol <- lastClicked$geneSymbol
+        inputsValue$geneID_DE <- geneID <- lastClicked$geneID
+        inputsValue$geneSymbol_DE <- geneSymbol <- lastClicked$geneSymbol
        
         seqMat <- processedDataSub()
         exprMat <- assays(seqMat)[["Intensity"]]
@@ -1038,7 +1042,7 @@ shinyServer(function(input, output, session) {
   })
   #################################################### time series clustering ##################################################
   
-  ####Widgets
+  #### Widgets
   # the selection box to select the treatment
   output$clusterTreatBox <- renderUI({
     allTreat <- unique(processedData()$treatment)

@@ -202,7 +202,7 @@ navbarPage("SmartPhos explorer",
                         actionButton("runDE",label = "Run DE analysis"),
                         textInput("pFilter","p value cutoff", value = 0.05),
                         checkboxInput("ifAdjusted","Use adjusted p values", value = FALSE),
-                        textInput("fcFilter","log2FC coefficient cutoff", value = 0.5)
+                        textInput("fcFilter","log2FC cutoff", value = 0.5)
                       ),
                       mainPanel(
                         DT::dataTableOutput("DEtab"),
