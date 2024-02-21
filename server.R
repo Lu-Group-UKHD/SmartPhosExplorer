@@ -1164,32 +1164,32 @@ shinyServer(function(input, output, session) {
                                   processedData()$timepoint %in% input$seleTimeRange]
       processedDataRef <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & 
                                   processedData()$timepoint %in% input$seleTimeRange]
-      # Match processedDataSub and processedDataRef by subjectID and timepoint if subjectID is available
-      if (!is.null(processedData()$subjectID)) {
-        processedDataSub <- processedDataSub[,match(paste0(processedDataRef$subjectID,"_",processedDataRef$timepoint),
-                                                    paste0(processedDataSub$subjectID,"_",processedDataSub$timepoint))] # make sure order is the same 
-      } else {
-        # arrange processedDataSub and processedDataRef by timepoints
-        posRef <- posSub <- c()
-        allTimePoint <- unique(processedDataRef$timepoint)
-        for (time in unique(processedDataRef$timepoint)) {
-          pointerSub <- which(processedDataSub$timepoint == time)
-          pointerRef <- which(processedDataRef$timepoint == time)
-          posSub <- append(posSub, pointerSub)
-          posRef <- append(posRef, pointerRef)
-        }
-        processedDataSub <- processedDataSub[,posSub]
-        processedDataRef <- processedDataRef[,posRef]
-      } 
       assayMat <- assay(processedDataSub)
       RefMat <- assay(processedDataRef)
-      
-      #  calculate fold change per matching sample first, apply spline filter, THEN calculate the mean logFC per time point
+      # calculate fold change by subtracting assayMat to mean intensities of RefMat
+      #  here the mean intensities in RefMat are calculated per time point or per time point and subject ID.
+      if (!is.null(processedData()$subjectID)) {
+        fcMat <- lapply(unique(processedDataSub$timepoint), function(tp) {
+          lapply(unique(processedDataSub$subjectID), function(id) {
+            RefMean = rowMeans(RefMat[,processedDataRef$timepoint == tp & 
+                                        processedDataRef$subjectID == id]) 
+            assayMat[,processedDataSub$timepoint == tp & processedDataSub$subjectID == id] - RefMean
+          })
+        }) %>% bind_cols() %>% as.matrix()
+      } else {
+        fcMat <- lapply(unique(processedDataSub$timepoint), function(tp) {
+          RefMean = rowMeans(RefMat[,processedDataRef$timepoint == tp]) 
+          assayMat[,processedDataSub$timepoint == tp] - RefMean
+        }) %>% bind_cols() %>% as.matrix()
+      } 
+      rownames(fcMat) <- rownames(assayMat)
+      # rearrange columns in processedDataSub to match with fcMat for splineFilter and calculating mean logFC later
+      processedDataSub <- processedDataSub[,colnames(fcMat)]
+      #  apply spline filter
       inputsValue$ifFilterFit <- input$ifFilterFit
       if (input$ifFilterFit) {
         inputsValue$pSpline <- input$pSpline
         inputsValue$ifSplineFdr <- input$ifSplineFdr
-        fcMat <- assayMat - RefMat
         if (!is.null(processedDataSub$subjectID)) {
           fcMat <- splineFilter(fcMat, subjectID = processedDataSub$subjectID,
                                 time = processedDataSub$timepoint,
@@ -1411,26 +1411,27 @@ shinyServer(function(input, output, session) {
                                     processedData()$timepoint %in% input$seleTimeRange]
         RefMat <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & 
                                     processedData()$timepoint %in% input$seleTimeRange]
-        # Match seqMat and RefMat by subjectID and timepoint if subjectID is available,
-        # otherwise match by only timepoints
+        # calculate fold change by subtracting assayMat to mean intensities of RefMat
+        #  here the mean intensities in RefMat are calculated per time point or per time point and subject ID.
         if (!is.null(processedData()$subjectID)) {
-          seqMat <- seqMat[,match(paste0(RefMat$subjectID,"_",RefMat$timepoint),
-                                  paste0(seqMat$subjectID,"_",seqMat$timepoint))]  # make sure order is the same 
-        }
-        else {
-          # arrange processedDataSub and processedDataRef by timepoints
-          posRef <- posSub <- c()
-          for (time in unique(RefMat$timepoint)) {
-            pointerSub <- which(seqMat$timepoint == time)
-            pointerRef <- which(RefMat$timepoint == time)
-            posSub <- append(posSub, pointerSub)
-            posRef <- append(posRef, pointerRef)
-          }
-          seqMat <- seqMat[,posSub]
-          RefMat <- RefMat[,posRef]
-        }
-        # compute the fold change
-        assay(seqMat) <- assay(seqMat) - assay(RefMat)
+          fcMat <- lapply(unique(seqMat$timepoint), function(tp) {
+            lapply(unique(seqMat$subjectID), function(id) {
+              RefMean = rowMeans(assay(RefMat)[,RefMat$timepoint == tp & 
+                                                 RefMat$subjectID == id]) 
+              assay(seqMat)[,seqMat$timepoint == tp & seqMat$subjectID == id] - RefMean
+            })
+          }) %>% bind_cols() %>% as.matrix()
+        } else {
+          fcMat <- lapply(unique(seqMat$timepoint), function(tp) {
+            RefMean = rowMeans(assay(RefMat)[,refMat$timepoint == tp]) 
+            assay(seqMat)[,seqMat$timepoint == tp] - RefMean
+          }) %>% bind_cols() %>% as.matrix()
+        } 
+        rownames(fcMat) <- rownames(assay(seqMat))
+        # rearrange columns in seq to match with fcMat to assign the fold change
+        seqMat <- seqMat[,colnames(fcMat)]
+        # assign fcMat to assay(seqMat)
+        assay(seqMat) <- fcMat
         yLabText <- "logFC"
       } else if (input$clusterFor == "two-condition expression") {
         seqMat <- processedData()[,processedData()$treatment %in% c(input$seleTreat_cluster,input$seleTreat_clusterRef) &
@@ -1451,18 +1452,21 @@ shinyServer(function(input, output, session) {
       plotTab$time <- as.numeric(gsub("h|min", "", plotTab$time))
       p <- ggplot(plotTab, aes(x= time, y = value)) +
         geom_point(aes(color = treatment), size=3) + 
-        stat_summary(aes(color=paste("mean",treatment)),fun = mean, geom = "line", linewidth = 2)+
+        stat_summary(aes(color=paste("mean",treatment)),fun = mean, geom = "line", linewidth = 2)
+      # connect the dots across time points by subjectID if provided
+      if (!is.null(seqMat$subjectID)) { # overwrite the plot object if subjectID is provided
+        plotTab$subjectID <- seqMat$subjectID
+        p <- ggplot(plotTab, aes(x= time, y = value,color = paste0(subjectID,"_",treatment))) +
+          geom_point( size=3) + 
+          stat_summary(fun = mean, geom = "line", linewidth = 1,linetype = "dashed")
+        
+      }
+      p <- p +
         ylab(yLabText) + xlab("time") + 
         ggtitle(geneSymbol) + theme_bw() + 
         theme(text=element_text(size=15),plot.title = element_text(hjust = 0.5),
               legend.position = "bottom",
               axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5, size=15))
-      # connect the dots across time points by subjectID if provided
-      if (!is.null(seqMat$subjectID)) {
-        plotTab$subjectID <- seqMat$subjectID
-        plotTab <- plotTab %>% mutate(patCondi = paste0(subjectID,"_",treatment))
-        p <- p + geom_line(aes(group = patCondi), linetype = "dotted", color = "grey50") 
-      }
       p
     } else {
       NULL
@@ -1946,22 +1950,26 @@ shinyServer(function(input, output, session) {
           } else if (input$clusterFor == "logFC"){
             seqMat <- processedData()[,processedData()$treatment == input$seleTreat_cluster & processedData()$timepoint %in% input$seleTimeRange]
             RefMat <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & processedData()$timepoint %in% input$seleTimeRange]
-            # Match seqMat and RefMat by subjectID and time point OR by time point and replicate (if subjectID not provided)
-            if (!is.null(RefMat$subjectID)) {
-              seqMat <- seqMat[,match(paste0(RefMat$subjectID,"_",RefMat$timepoint), paste0(seqMat$subjectID,"_",seqMat$timepoint))] #make sure order is the same 
+            # calculate fold change by subtracting assayMat to mean intensities of RefMat
+            #  here the mean intensities in RefMat are calculated per time point or per time point and subject ID (if provided).
+            if (!is.null(processedData()$subjectID)) {
+              fcMat <- lapply(unique(seqMat$timepoint), function(tp) {
+                lapply(unique(seqMat$subjectID), function(id) {
+                  RefMean = rowMeans(assay(RefMat)[,RefMat$timepoint == tp & RefMat$subjectID == id]) 
+                  assay(seqMat)[,seqMat$timepoint == tp & seqMat$subjectID == id] - RefMean
+                })
+              }) %>% bind_cols() %>% as.matrix()
             } else {
-              posRef <- posSub <- c()
-              for (time in unique(RefMat$timepoint)) {
-                pointerSub <- which(seqMat$timepoint == time)
-                pointerRef <- which(RefMat$timepoint == time)
-                posSub <- append(posSub, pointerSub)
-                posRef <- append(posRef, pointerRef)
-              }
-              seqMat <- seqMat[,posSub]
-              RefMat <- RefMat[,posRef]
-            # compute the fold change
-            assay(seqMat) <- assay(seqMat) - assay(RefMat)
-            }
+              fcMat <- lapply(unique(seqMat$timepoint), function(tp) {
+                RefMean = rowMeans(assay(RefMat)[,refMat$timepoint == tp]) 
+                assay(seqMat)[,seqMat$timepoint == tp] - RefMean
+              }) %>% bind_cols() %>% as.matrix()
+            } 
+            rownames(fcMat) <- rownames(assay(seqMat))
+            # rearrange columns in seq to match with fcMat to assign the fold change
+            seqMat <- seqMat[,colnames(fcMat)]
+            # assign fcMat to assay(seqMat)
+            assay(seqMat) <- fcMat
             yLabText <- "logFC"
           } else if (input$clusterFor == "two-condition expression") {
             seqMat <- processedData()[,processedData()$treatment %in% c(input$seleTreat_cluster,input$seleTreat_clusterRef) & processedData()$timepoint %in% input$seleTimeRange]
@@ -1982,7 +1990,8 @@ shinyServer(function(input, output, session) {
             }
             plotTab$time <- as.numeric(gsub("h|min","", plotTab$time))
             p <- ggplot(plotTab, aes(x= time, y = value)) +
-              geom_point(aes(color = treatment), size=3) 
+              geom_point(aes(color = treatment), size=3) +
+              stat_summary(aes(color=paste("mean",treatment)),fun = mean, geom = "line", linewidth = 2)
           } else {
             plotTab <- data.frame(time = seqMat$timepoint,
                                   value = assays(seqMat)[["Intensity"]][geneID,], 
@@ -1994,12 +2003,11 @@ shinyServer(function(input, output, session) {
               plotTab$time[str_ends(plotTab$time, "min")] <- 1/60 * as.numeric(gsub("min", "", plotTab$time[str_ends(plotTab$time, "min")]))
             }
             plotTab$time <- as.numeric(gsub("h|min","", plotTab$time))
-            p <- ggplot(plotTab, aes(x= time, y = value)) +
-              geom_point(aes(color = treatment), size=3) + 
-              geom_line(aes(group = patCondi), linetype = "dotted", color = "grey50")
+            p <- ggplot(plotTab, aes(x= time, y = value, color = paste0(subjectID,"_",treatment))) +
+              geom_point(size=3) + 
+              stat_summary(fun = mean, geom = "line", linewidth = 1,linetype = "dashed")
           }
           p <- p + 
-            stat_summary(aes(color=paste("mean",treatment)),fun = mean, geom = "line", linewidth = 2) +
             ylab(yLabText) + xlab("time") + 
             ggtitle(geneSymbol) + theme_bw() + 
             theme(text = element_text(size=15), plot.title = element_text(hjust = 0.5),
