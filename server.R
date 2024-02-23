@@ -266,6 +266,8 @@ shinyServer(function(input, output, session) {
       colData(se) <- colData(maeData[, colnames(se)])
       # make sure NUll is passed to batch argument when user have not selected Batch correction
       if (input$batch) batchCol <- input$colBatch else batchCol <- NULL
+      inputsValue$batch <- input$batch
+      inputsValue$colBatch <- batchCol
       
       if (input$assay == "Proteome") {
         # function from the utils.R script for the preprocessing of the data

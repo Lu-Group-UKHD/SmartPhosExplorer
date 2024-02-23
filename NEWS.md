@@ -2,7 +2,7 @@
 
 ## Version: 1.0.3
 
-Date: 2024-02-13
+Date: 2024-02-23
 
 CHANGES IN VERSION 1.0.3
 
@@ -20,7 +20,8 @@ Differential expression analysis:
 
 Preprocessing:
 
-* User can subset data using the filtering options present on the top of the table being displayed. 
+* User can subset data using the filtering options present on the top of the table being displayed.
+* Option to correct for batch effects is added in the preprocessing step. 
 
 -------------------------------------------------------
 
