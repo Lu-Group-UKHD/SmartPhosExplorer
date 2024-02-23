@@ -224,6 +224,15 @@ shinyServer(function(input, output, session) {
       }
   })
   
+  # render select option for selecting column(s) for batch effects removal
+  output$seleColBatch <- renderUI({
+    if(input$batch) {
+      selectizeInput("colBatch", "Choose up to 2 columns:",
+                     colnames(colData(mae())),
+                     multiple = TRUE,
+                     options = list(maxItems = 2))
+    }
+  }) 
   
   observeEvent(input$processSelection, {
     withProgress(message = 'Processing files', {
@@ -255,6 +264,9 @@ shinyServer(function(input, output, session) {
       # summarizedAssayExperiment object of the selected assay
       se <- maeData[[input$assay]]
       colData(se) <- colData(maeData[, colnames(se)])
+      # make sure NUll is passed to batch argument when user have not selected Batch correction
+      if (input$batch) batchCol <- input$colBatch else batchCol <- NULL
+      
       if (input$assay == "Proteome") {
         # function from the utils.R script for the preprocessing of the data
         fp <- preprocessProteome(se, filterList = NULL,
@@ -264,6 +276,7 @@ shinyServer(function(input, output, session) {
                                  missCut = input$missFilter,
                                  removeOutlier = strsplit(input$outliers, ",\\s*")[[1]],
                                  impute = input$impute,
+                                 batch = batchCol,
                                  scaleFactorTab = NULL)
         processedDataUF(fp)
       }
@@ -275,6 +288,7 @@ shinyServer(function(input, output, session) {
                              missCut = input$missFilter,
                              removeOutlier = strsplit(input$outliers, ",\\s*")[[1]],
                              impute = input$impute,
+                             batch = batchCol,
                              scaleFactorTab = NULL)
         processedDataUF(pp)
       }

@@ -263,7 +263,7 @@ plotAdjustmentResults <- function(maeData, normalization = FALSE) {
 # Function to preprocess proteomic data
 preprocessProteome <- function(seData, filterList = NULL, missCut = 50,
                                transform = "log2", normalize = FALSE, getPP = FALSE,
-                               removeOutlier = NULL, impute = "QRILC",
+                               removeOutlier = NULL, impute = "QRILC", batch = NULL,
                                verbose = FALSE, scaleFactorTab = NULL) {
   
   # seData, is the multiAassayExperiment object from SmartPhos
@@ -374,13 +374,32 @@ preprocessProteome <- function(seData, filterList = NULL, missCut = 50,
       }
   }
   
+  if(!is.null(batch)) {
+    if(length(batch) == 1) {
+      remBatchImp <- limma::removeBatchEffect(assays(fpeSub)[["imputed"]],
+                                              batch = colData(fpeSub)[,batch])
+      remBatch <- limma::removeBatchEffect(assay(fpeSub),
+                                           batch = colData(fpeSub)[,batch])
+    }
+    else {
+      remBatchImp <- limma::removeBatchEffect(assays(fpeSub)[["imputed"]],
+                                              batch = colData(fpeSub)[,batch[1]],
+                                              batch2 = colData(fpeSub)[,batch[2]])
+      remBatch <- limma::removeBatchEffect(assay(fpeSub),
+                                           batch = colData(fpeSub)[,batch[1]],
+                                           batch2 = colData(fpeSub)[,batch[2]])
+    }
+    assays(fpeSub)[["imputed"]] <- assay(remBatchImp)
+    assay(fpeSub) <- assay(remBatch)
+  }
+  
   return(fpeSub)
 }
 
 # Function to preprocess phospho proteomic data
 preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
                            transform="log2", normalize = FALSE, getFP = FALSE,
-                           removeOutlier = NULL, assayName = NULL,
+                           removeOutlier = NULL, assayName = NULL, batch = NULL,
                            scaleFactorTab = NULL, impute = "QRILC", verbose = FALSE) {
   
   # This function is largely the same as the function above, but it's intended
@@ -500,6 +519,26 @@ preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
       print(dim(ppeSub))
     }
   }
+  
+  if(!is.null(batch)) {
+    if(length(batch) == 1) {
+      remBatchImp <- limma::removeBatchEffect(assays(ppeSub)[["imputed"]],
+                                              batch = colData(ppeSub)[,batch])
+      remBatch <- limma::removeBatchEffect(assay(ppeSub),
+                                           batch = colData(ppeSub)[,batch])
+    }
+    else {
+      remBatchImp <- limma::removeBatchEffect(assays(ppeSub)[["imputed"]],
+                                              batch = colData(ppeSub)[,batch[1]],
+                                              batch2 = colData(ppeSub)[,batch[2]])
+      remBatch <- limma::removeBatchEffect(assay(ppeSub),
+                                           batch = colData(ppeSub)[,batch[1]],
+                                           batch2 = colData(ppeSub)[,batch[2]])
+    }
+    assays(ppeSub)[["imputed"]] <- assay(remBatchImp)
+    assay(ppeSub) <- assay(remBatch)
+  }
+  
   return(ppeSub)
 }
 
