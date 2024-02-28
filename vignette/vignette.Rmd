@@ -1,7 +1,7 @@
 ---
 title: "SmartPhos Explorer: a ShinyApp pipeline for processing and analysing phosphoproteomics data"
 author: "Shubham Agrawal, Cong Quan Ta"
-date: "2024-02-05"
+date: "2024-02-28"
 output:
   BiocStyle::html_document:
     toc_float: true
@@ -39,7 +39,7 @@ The vignette will go through the different tabs of the shiny app and explains ho
 
 # Preprocessing tab
 
-This tab contains the preprocessing options before diving into the data for exploratory and downstream analysis. This tab allows the user to upload a MultiAssayExperiment object or upload a zip file containing mass spectrometry files. It contains options for selecting between the proteome or phosphoproteome assay. Options for choosing the transformation method, normalization, and displaying the missing values are available. There is also an option for saving the R object in the app.
+This tab contains the preprocessing options before diving into the data for exploratory and downstream analysis. This tab allows the user to upload a MultiAssayExperiment object or upload a zip file containing mass spectrometry files. It contains options for selecting between the proteome or phosphoproteome assay. Options for choosing the transformation method, normalization, correction for batch effects, and displaying the missing values are available. There is also an option for saving the R object in the app.
 
 ## Upload options
 
@@ -120,6 +120,7 @@ SmartPhos package performs some pre-filtering and preprocessing based on various
   + BPCA (Bayesian PCA)
   + MLE (Maximum Likelihood Estimation)
   + Random forest
+* **Batch effects removal**: This option provides the abilty to correct for batch effects. It uses *removeBatchEffect()* from the *limma* package. The users can select the maximum of two columns. The columns used for batch effects removal should be present in the fileTable.txt file.
   
 After selecting the options, press the **Process** button to perform the preprocessing. 
   
@@ -134,8 +135,9 @@ The preprocessing tab has some more options:
 * Plot the completeness of the assay. It will plot a bar plot displaying percentage of completeness for each sample.
 * Launching MatrixQCvis. Another shiny app for exploratory analysis.
 * Saving, loading and removing results. The multiAssayExperiment object can be saved, loaded and removed within the shiny app.
-* Samples which are outliers can be removed. Simply writing the names of the samples (delimited by comma) in the text box will remove those samples.
+* Samples which are outliers can be removed. Simply writing the names of the samples (delimited by comma) in the text box will remove those samples. It also supports regex option. For example: if "100min" is typed in the outlier box, then all the samples with 100min timepoint will be removed. 
 * Coloring the box plot based on different annotations is also possible. 
+* Subsetting of the dataset is possible from the displayed table. The selected annotations in the filter options of different columns will be used for subsetting the data. The following tabs of the shinyApp will use that subsetted data for further exploration and analysis. Subsetting can be undone by simply removing the annotations from filter boxes. 
 
 ```{r, out.width="320px"}
 knitr::include_graphics("images/otherOptions1.png")
