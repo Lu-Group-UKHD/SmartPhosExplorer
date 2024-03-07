@@ -107,7 +107,7 @@ navbarPage("SmartPhos explorer",
                         )
                       ),
                     mainPanel(
-                      textAreaInput('outliers', 'Enter sample outliers (comma delimited)',
+                      textAreaInput('outliers', 'Enter sample outliers (comma delimited) to be removed',
                                     width = "100%", rows = 5, resize = "both"),
                       tableOutput("label"),
                       uiOutput("colorBoxUI"),

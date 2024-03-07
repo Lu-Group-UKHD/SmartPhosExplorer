@@ -319,6 +319,7 @@ shinyServer(function(input, output, session) {
     if (!is.null(processedDataUF())) {
       colDataTable <- mutate_if(data.frame(colData(processedDataUF())), is.character, as.factor)
       datatable(colDataTable, filter = "top", rownames = FALSE,
+                caption = "Subset the data for further analysis by selecting the annotations in the filtering boxes",
                 selection = "none", style = "bootstrap")
     }
     else {
