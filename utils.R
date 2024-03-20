@@ -547,6 +547,9 @@ preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
 # Function to plot time-series clustering results
 clusterTS <- function(x, k, pCut = NULL, twoCondition = FALSE) {
   
+  # set seed for reproducible clustering results
+  set.seed(12345)
+  
   # x, input matrix, rows as feature, columns as time points
   # k, number of clusters
   
