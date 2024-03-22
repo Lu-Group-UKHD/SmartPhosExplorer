@@ -1105,6 +1105,9 @@ shinyServer(function(input, output, session) {
     }
   )
   
+  # reactive value to save all the timepoints
+  allTime <- reactiveVal()
+  
   # selecting time range
   output$timerangeBox <- renderUI({
     # list the time points available to the selected treatment
@@ -1132,8 +1135,35 @@ shinyServer(function(input, output, session) {
       timepointRef <- timepointRef[!timepointRef %in% remove1sampleT]
       allTimepoint <- intersect(allTimepoint, timepointRef)  # select only the intersection
     }
+    
+    allTime(allTimepoint)
+    
     checkboxGroupInput("seleTimeRange", "Time points to include",
                        allTimepoint, allTimepoint, inline = TRUE)
+  })
+  
+  # UI for adding zero timepoint
+  output$zeroTime <- renderUI({
+    if (!('0min' %in% allTime())) {
+      checkboxInput("addZero","Add zero timepoint", FALSE)
+    }
+  })
+  
+  output$zeroTreat <- renderUI({
+    if (input$addZero) {
+      cd <- colData(processedData())
+      treatment <- unique(cd$treatment[cd$timepoint == "0min"])
+      
+      output$zeroTreatInfo <- renderUI({
+        if (input$addZero) {
+          HTML(sprintf("Found %s treatments with 0min timepoints",
+                       length(treatment)))
+        }
+      })
+      
+      selectInput("seleZeroTreat", "Select treatment for copying the values:",
+                  treatment,selected = NULL)
+    }
   })
   
   exprMatObj <- reactive({
