@@ -1172,8 +1172,14 @@ shinyServer(function(input, output, session) {
       inputsValue$clusterFor <- input$clusterFor
       inputsValue$seleTreat_cluster <- input$seleTreat_cluster
       inputsValue$seleTimeRange <- input$seleTimeRange
-      processedDataSub <- processedData()[, processedData()$treatment == input$seleTreat_cluster & 
-                                  processedData()$timepoint %in% input$seleTimeRange]
+      if (!is.null(input$seleZeroTreat) & input$addZero) {
+        processedDataSub <- addZeroTime(processedData(), input$seleTreat_cluster,
+                                        input$seleZeroTreat, input$seleTimeRange)
+      }
+      else {
+        processedDataSub <- processedData()[, processedData()$treatment == input$seleTreat_cluster & 
+                                              processedData()$timepoint %in% input$seleTimeRange]
+      }
       assayMat <- assay(processedDataSub)
       inputsValue$ifFilterFit <- input$ifFilterFit
       # Filtering genes with p values from the spline fit test
@@ -1207,10 +1213,38 @@ shinyServer(function(input, output, session) {
       inputsValue$clusterFor <- input$clusterFor
       inputsValue$seleTreat_cluster <- input$seleTreat_cluster
       inputsValue$seleTimeRange <- input$seleTimeRange
-      processedDataSub <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
-                                  processedData()$timepoint %in% input$seleTimeRange]
-      processedDataRef <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & 
-                                  processedData()$timepoint %in% input$seleTimeRange]
+      if (!is.null(input$seleZeroTreat) & input$addZero) {
+        processedDataSub <- processedData()[, processedData()$treatment == input$seleTreat_cluster]
+        allTimepoint <- unique(processedDataSub$timepoint)
+        
+        processedDataRef <- processedData()[, processedData()$treatment == input$seleTreat_clusterRef]
+        timepointRef <- unique(processedDataRef$timepoint)
+        # add zero timepoint samples if missing
+        if (!("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+          processedDataSub <- addZeroTime(processedData(), input$seleTreat_cluster,
+                                          input$seleZeroTreat, input$seleTimeRange)
+          processedDataRef <- addZeroTime(processedData(), input$seleTreat_clusterRef,
+                                          input$seleZeroTreat, input$seleTimeRange)
+        }
+        else if (!("0min" %in% allTimepoint) & ("0min" %in% timepointRef)) {
+          processedDataSub <- addZeroTime(processedData(), input$seleTreat_cluster,
+                                          input$seleZeroTreat, input$seleTimeRange)
+          processedDataRef <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & 
+                                                processedData()$timepoint %in% input$seleTimeRange]
+        }
+        else if (("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+          processedDataSub <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
+                                                processedData()$timepoint %in% input$seleTimeRange]
+          processedDataRef <- addZeroTime(processedData(), input$seleTreat_clusterRef,
+                                          input$seleZeroTreat, input$seleTimeRange)
+        }
+      }
+      else {
+        processedDataSub <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
+                                              processedData()$timepoint %in% input$seleTimeRange]
+        processedDataRef <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & 
+                                              processedData()$timepoint %in% input$seleTimeRange]
+      }
       assayMat <- assay(processedDataSub)
       RefMat <- assay(processedDataRef)
       # calculate fold change by subtracting assayMat to mean intensities of RefMat
@@ -1275,8 +1309,51 @@ shinyServer(function(input, output, session) {
       inputsValue$seleTreat_cluster <- input$seleTreat_cluster
       inputsValue$seleTreat_clusterRef <- input$seleTreat_clusterRef
       inputsValue$seleTimeRange <- input$seleTimeRange
-      processedDataSub <- processedData()[,processedData()$treatment %in% c(input$seleTreat_cluster, input$seleTreat_clusterRef) & 
-                                  processedData()$timepoint %in% input$seleTimeRange]
+      if (!is.null(input$seleZeroTreat) & input$addZero) {
+        processedDataSub <- processedData()[, processedData()$treatment == input$seleTreat_cluster]
+        allTimepoint <- unique(processedDataSub$timepoint)
+        
+        processedDataRef <- processedData()[, processedData()$treatment == input$seleTreat_clusterRef]
+        timepointRef <- unique(processedDataRef$timepoint)
+        # add zero timepoint samples if missing
+        if (!("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+          processedData1 <- addZeroTime(processedData(), input$seleTreat_cluster,
+                                        input$seleZeroTreat, input$seleTimeRange)
+          processedData2 <- addZeroTime(processedData(), input$seleTreat_clusterRef,
+                                        input$seleZeroTreat, input$seleTimeRange)
+          assay <- cbind(assay(processedData1), assay(processedData2))
+          cd <- rbind(colData(processedData1), colData(processedData2))
+          emeta <- elementMetadata(processedData())
+          
+          processedDataSub <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
+        }
+        else if (!("0min" %in% allTimepoint) & ("0min" %in% timepointRef)) {
+          processedData1 <- addZeroTime(processedData(), input$seleTreat_cluster,
+                                        input$seleZeroTreat, input$seleTimeRange)
+          processedData2 <- processedData()[, processedData()$treatment == input$seleTreat_clusterRef & 
+                                              processedData()$timepoint %in% input$seleTimeRange]
+          assay <- cbind(assay(processedData1), assay(processedData2))
+          cd <- rbind(colData(processedData1), colData(processedData2))
+          emeta <- elementMetadata(processedData())
+          
+          processedDataSub <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
+        }
+        else if (("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+          processedData1 <- processedData()[, processedData()$treatment == input$seleTreat_cluster & 
+                                              processedData()$timepoint %in% input$seleTimeRange]
+          processedData2 <- addZeroTime(processedData(), input$seleTreat_clusterRef,
+                                        input$seleZeroTreat, input$seleTimeRange)
+          assay <- cbind(assay(processedData1), assay(processedData2))
+          cd <- rbind(colData(processedData1), colData(processedData2))
+          emeta <- elementMetadata(processedData())
+          
+          processedDataSub <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
+        }
+      }
+      else {
+        processedDataSub <- processedData()[,processedData()$treatment %in% c(input$seleTreat_cluster, input$seleTreat_clusterRef) & 
+                                              processedData()$timepoint %in% input$seleTimeRange]
+      }
       assayMat <- assay(processedDataSub)
       inputsValue$ifFilterFit <- input$ifFilterFit
       if (input$ifFilterFit) {
@@ -1450,14 +1527,49 @@ shinyServer(function(input, output, session) {
       inputsValue$geneSymbolclust <- geneSymbol
       
       if (input$clusterFor == "expression") {
-        seqMat <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
-                                    processedData()$timepoint %in% input$seleTimeRange]
+        if (!is.null(input$seleZeroTreat) & input$addZero) {
+          seqMat <- addZeroTime(processedData(), input$seleTreat_cluster,
+                                input$seleZeroTreat, input$seleTimeRange)
+        }
+        else {
+          seqMat <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
+                                      processedData()$timepoint %in% input$seleTimeRange]
+        }
         yLabText <- "Normalized expression"
-      } else if (input$clusterFor == "logFC"){
-        seqMat <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
-                                    processedData()$timepoint %in% input$seleTimeRange]
-        RefMat <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & 
-                                    processedData()$timepoint %in% input$seleTimeRange]
+      } 
+      else if (input$clusterFor == "logFC"){
+        if (!is.null(input$seleZeroTreat) & input$addZero) {
+          processedDataSub <- processedData()[, processedData()$treatment == input$seleTreat_cluster]
+          allTimepoint <- unique(processedDataSub$timepoint)
+          
+          processedDataRef <- processedData()[, processedData()$treatment == input$seleTreat_clusterRef]
+          timepointRef <- unique(processedDataRef$timepoint)
+          # add zero timepoint samples if missing
+          if (!("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+            seqMat <- addZeroTime(processedData(), input$seleTreat_cluster,
+                                  input$seleZeroTreat, input$seleTimeRange)
+            RefMat <- addZeroTime(processedData(), input$seleTreat_clusterRef,
+                                  input$seleZeroTreat, input$seleTimeRange)
+          }
+          else if (!("0min" %in% allTimepoint) & ("0min" %in% timepointRef)) {
+            seqMat <- addZeroTime(processedData(), input$seleTreat_cluster,
+                                  input$seleZeroTreat, input$seleTimeRange)
+            RefMat <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & 
+                                        processedData()$timepoint %in% input$seleTimeRange]
+          }
+          else if (("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+            seqMat <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
+                                        processedData()$timepoint %in% input$seleTimeRange]
+            RefMat <- addZeroTime(processedData(), input$seleTreat_clusterRef,
+                                  input$seleZeroTreat, input$seleTimeRange)
+          }
+        }
+        else {
+          seqMat <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
+                                      processedData()$timepoint %in% input$seleTimeRange]
+          RefMat <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & 
+                                      processedData()$timepoint %in% input$seleTimeRange]
+        }
         # calculate fold change by subtracting assayMat to mean intensities of RefMat
         #  here the mean intensities in RefMat are calculated per time point or per time point and subject ID.
         if (!is.null(processedData()$subjectID)) {
@@ -1470,7 +1582,7 @@ shinyServer(function(input, output, session) {
           }) %>% bind_cols() %>% as.matrix()
         } else {
           fcMat <- lapply(unique(seqMat$timepoint), function(tp) {
-            RefMean = rowMeans(assay(RefMat)[,refMat$timepoint == tp]) 
+            RefMean = rowMeans(assay(RefMat)[,RefMat$timepoint == tp]) 
             assay(seqMat)[,seqMat$timepoint == tp] - RefMean
           }) %>% bind_cols() %>% as.matrix()
         } 
@@ -1480,9 +1592,53 @@ shinyServer(function(input, output, session) {
         # assign fcMat to assay(seqMat)
         assay(seqMat) <- fcMat
         yLabText <- "logFC"
-      } else if (input$clusterFor == "two-condition expression") {
-        seqMat <- processedData()[,processedData()$treatment %in% c(input$seleTreat_cluster,input$seleTreat_clusterRef) &
-                                    processedData()$timepoint %in% input$seleTimeRange]
+      } 
+      else if (input$clusterFor == "two-condition expression") {
+        if (!is.null(input$seleZeroTreat) & input$addZero) {
+          processedDataSub <- processedData()[, processedData()$treatment == input$seleTreat_cluster]
+          allTimepoint <- unique(processedDataSub$timepoint)
+          
+          processedDataRef <- processedData()[, processedData()$treatment == input$seleTreat_clusterRef]
+          timepointRef <- unique(processedDataRef$timepoint)
+          # add zero timepoint samples if missing
+          if (!("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+            processedData1 <- addZeroTime(processedData(), input$seleTreat_cluster,
+                                          input$seleZeroTreat, input$seleTimeRange)
+            processedData2 <- addZeroTime(processedData(), input$seleTreat_clusterRef,
+                                          input$seleZeroTreat, input$seleTimeRange)
+            assay <- cbind(assay(processedData1), assay(processedData2))
+            cd <- rbind(colData(processedData1), colData(processedData2))
+            emeta <- elementMetadata(processedData())
+            
+            seqMat <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
+          }
+          else if (!("0min" %in% allTimepoint) & ("0min" %in% timepointRef)) {
+            processedData1 <- addZeroTime(processedData(), input$seleTreat_cluster,
+                                          input$seleZeroTreat, input$seleTimeRange)
+            processedData2 <- processedData()[, processedData()$treatment == input$seleTreat_clusterRef & 
+                                                processedData()$timepoint %in% input$seleTimeRange]
+            assay <- cbind(assay(processedData1), assay(processedData2))
+            cd <- rbind(colData(processedData1), colData(processedData2))
+            emeta <- elementMetadata(processedData())
+            
+            seqMat <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
+          }
+          else if (("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+            processedData1 <- processedData()[, processedData()$treatment == input$seleTreat_cluster & 
+                                                processedData()$timepoint %in% input$seleTimeRange]
+            processedData2 <- addZeroTime(processedData(), input$seleTreat_clusterRef,
+                                          input$seleZeroTreat, input$seleTimeRange)
+            assay <- cbind(assay(processedData1), assay(processedData2))
+            cd <- rbind(colData(processedData1), colData(processedData2))
+            emeta <- elementMetadata(processedData())
+            
+            seqMat <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
+          }
+        }
+        else {
+          seqMat <- processedData()[,processedData()$treatment %in% c(input$seleTreat_cluster, input$seleTreat_clusterRef) & 
+                                      processedData()$timepoint %in% input$seleTimeRange]
+        }
         yLabText <- "Normalized expression"
       }
       

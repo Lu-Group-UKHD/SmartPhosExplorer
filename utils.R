@@ -542,7 +542,24 @@ preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
   return(ppeSub)
 }
 
-
+# function to add zero timepoint samples 
+addZeroTime <- function(data, treat, zeroTreat, timeRange) {
+  subset1 <- data[, data$treatment == treat & data$timepoint %in% timeRange]
+  subset2 <- data[, data$treatment == zeroTreat & data$timepoint == "0min"]
+  assay <- cbind(assay(subset1), assay(subset2))
+  colnames(assay) <- gsub(zeroTreat, treat, colnames(assay))
+  
+  cd1 <- colData(subset1)
+  cd2 <- colData(subset2)
+  cd <- rbind(cd1, cd2)
+  cd$treatment[cd$treatment == zeroTreat] = treat
+  cd$sample[cd$sample == zeroTreat] = treat
+  rownames(cd) <- gsub(zeroTreat, treat, rownames(cd))
+  
+  emeta <- elementMetadata(data)
+  
+  return(SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta))
+}
 
 # Function to plot time-series clustering results
 clusterTS <- function(x, k, pCut = NULL, twoCondition = FALSE) {
