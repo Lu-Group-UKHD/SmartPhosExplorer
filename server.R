@@ -31,7 +31,30 @@ shinyServer(function(input, output, session) {
   
   # save calculated results
   observeEvent(input$save, {
-    if (!is.null(mae())) {
+    # save the processed and filtered summarized experiment object
+    if (!is.null(processedData())) {
+      saveObj <- processedData()
+      fileName <- paste0(input$text, "_", format(Sys.Date(), "%Y%m%d"), ".Rds")
+      saveRDS(saveObj, file = paste0("save/", fileName))
+      saveList$file <- unique(c(saveList$file, fileName))
+      saveObj <- mae()
+      fileName <- paste0(input$text, "_mae_", format(Sys.Date(), "%Y%m%d"), ".Rds")
+      saveRDS(saveObj, file = paste0("save/", fileName))
+      saveList$file <- unique(c(saveList$file, fileName))
+    }
+    # save the processed summarized experiment object
+    else if (!is.null(processedDataUF())) {
+      saveObj <- processedDataUF()
+      fileName <- paste0(input$text, "_", format(Sys.Date(), "%Y%m%d"), ".Rds")
+      saveRDS(saveObj, file = paste0("save/", fileName))
+      saveList$file <- unique(c(saveList$file, fileName))
+      saveObj <- mae()
+      fileName <- paste0(input$text, "_mae_", format(Sys.Date(), "%Y%m%d"), ".Rds")
+      saveRDS(saveObj, file = paste0("save/", fileName))
+      saveList$file <- unique(c(saveList$file, fileName))
+    }
+    # save the multiAssayExperiment object
+    else if (!is.null(mae())) {
       saveObj <- mae()
       fileName <- paste0(input$text, "_", format(Sys.Date(), "%Y%m%d"), ".Rds")
       saveRDS(saveObj, file = paste0("save/", fileName))
