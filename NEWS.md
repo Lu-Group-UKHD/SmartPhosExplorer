@@ -1,5 +1,24 @@
 # SmartPhosExplorer update notes
 
+## Version: 1.0.4
+
+Date: 2024-03-27
+
+CHANGES IN VERSION 1.0.4
+
+------------------------------------------------
+
+Time series clustering:    
+
+* Introduce option for adding 0 timepoint for treatments for clustering and visualization. It simply copies the zero timepoint samples from the selected control. 
+* Set seed for making clustering results reproducible.
+
+Preprocessing:
+
+* Along with the multiAssayExperiment object, user can now save the summarized experiment object generated after clicking on the process button in the preprocessing panel. If the user has selected annotations for filtering in the displayed table, then a summarized experiment object with filtered values will be saved. 
+
+-------------------------------------------------------
+
 ## Version: 1.0.3
 
 Date: 2024-02-23
