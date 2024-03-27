@@ -1,7 +1,7 @@
 ---
 title: "SmartPhos Explorer: a ShinyApp pipeline for processing and analysing phosphoproteomics data"
 author: "Shubham Agrawal, Cong Quan Ta"
-date: "2024-02-28"
+date: "2024-03-27"
 output:
   BiocStyle::html_document:
     toc_float: true
@@ -138,6 +138,7 @@ The preprocessing tab has some more options:
 * Samples which are outliers can be removed. Simply writing the names of the samples (delimited by comma) in the text box will remove those samples. It also supports regex option. For example: if "100min" is typed in the outlier box, then all the samples with 100min timepoint will be removed. 
 * Coloring the box plot based on different annotations is also possible. 
 * Subsetting of the dataset is possible from the displayed table. The selected annotations in the filter options of different columns will be used for subsetting the data. The following tabs of the shinyApp will use that subsetted data for further exploration and analysis. Subsetting can be undone by simply removing the annotations from filter boxes. 
+* If the user has already clicked on process button in the prepocessing options panel, the processed assay will also be saved as a summarized experiment object along with the original multiAssayExperiment object when clicking on the save button. Same with the filtered or subsetted assay. The multiAssayExperiment object will have _mae_ keyword in the saved Rds object. 
 
 ```{r, out.width="320px"}
 knitr::include_graphics("images/otherOptions1.png")
@@ -308,13 +309,25 @@ knitr::include_graphics("images/timeSeriesClust2.png")
 
 Accompanying the plot is a table show the details of the genes in each cluster. User can select the cluster to view with the drop-down menu on the upper left side of the table. The table can be downloaded as a tsv file. The selected cluster will be used as input for enrichment analysis and kinase activity inference.
 ```{r}
-knitr::include_graphics("images/Q_time_series_example_result2.PNG")
+knitr::include_graphics("images/time_series_result2.png")
 ```
 
-Clicking on a gene will show a plot of its time-course expression level:
+Clicking on a gene will show a plot of its time-course expression level and a line showing the average expression level:
 ```{r}
-knitr::include_graphics("images/Q_time_series_example_result3.PNG")
+knitr::include_graphics("images/time_series_result3.png")
 ```
+
+In case zero timepoint is not available for a selected treatment, user has the option to add zero timepoint to the treatment from one of the controls (or conditions with zero timepoint). This will be reflected in the plots showing the clustering results and also when a particular gene is selected for seeing the normalized expression level.
+
+```{r, out.width="300px"}
+knitr::include_graphics("images/clustering0.png")
+```
+
+```{r}
+knitr::include_graphics("images/clustering1.png")
+knitr::include_graphics("images/clustering2.png")
+```
+
 
 If no cluster was found, for instance due to cut-off values being too high, users will be informed with a pop-up window:
 ```{r}
