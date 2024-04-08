@@ -10,6 +10,8 @@ normalize	Preprocessing	if normalization is desired or not
 missFilter	Preprocessing	percentage of missing values allowed
 outliers	Preprocessing	list of all the sample outliers to be removed for further analysis/exploration
 impute	Preprocessing	select the imputation method
+batch	Preprocessing	correct for batch effects
+colBatch	Preprocessing	column(s) used for batch effects correction
 colorBox	Preprocessing	color the box-plot based on the selected annotation
 xaxisPCA	PCA	principal component on x-axis
 yaxisPCA	PCA	principal component on y-axis
