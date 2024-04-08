@@ -1196,6 +1196,8 @@ shinyServer(function(input, output, session) {
       inputsValue$seleTreat_cluster <- input$seleTreat_cluster
       inputsValue$seleTimeRange <- input$seleTimeRange
       if (!is.null(input$seleZeroTreat) & input$addZero) {
+        inputsValue$addZero <- input$addZero
+        inputsValue$seleZeroTreat <- input$seleZeroTreat
         processedDataSub <- addZeroTime(processedData(), input$seleTreat_cluster,
                                         input$seleZeroTreat, input$seleTimeRange)
       }
@@ -1237,6 +1239,8 @@ shinyServer(function(input, output, session) {
       inputsValue$seleTreat_cluster <- input$seleTreat_cluster
       inputsValue$seleTimeRange <- input$seleTimeRange
       if (!is.null(input$seleZeroTreat) & input$addZero) {
+        inputsValue$addZero <- input$addZero
+        inputsValue$seleZeroTreat <- input$seleZeroTreat
         processedDataSub <- processedData()[, processedData()$treatment == input$seleTreat_cluster]
         allTimepoint <- unique(processedDataSub$timepoint)
         
@@ -1333,6 +1337,8 @@ shinyServer(function(input, output, session) {
       inputsValue$seleTreat_clusterRef <- input$seleTreat_clusterRef
       inputsValue$seleTimeRange <- input$seleTimeRange
       if (!is.null(input$seleZeroTreat) & input$addZero) {
+        inputsValue$addZero <- input$addZero
+        inputsValue$seleZeroTreat <- input$seleZeroTreat
         processedDataSub <- processedData()[, processedData()$treatment == input$seleTreat_cluster]
         allTimepoint <- unique(processedDataSub$timepoint)
         

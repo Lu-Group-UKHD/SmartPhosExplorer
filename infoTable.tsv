@@ -10,8 +10,6 @@ normalize	Preprocessing	if normalization is desired or not
 missFilter	Preprocessing	percentage of missing values allowed
 outliers	Preprocessing	list of all the sample outliers to be removed for further analysis/exploration
 impute	Preprocessing	select the imputation method
-batch	Preprocessing	correct for batch effects
-colBatch	Preprocessing	column(s) used for batch effects correction 
 colorBox	Preprocessing	color the box-plot based on the selected annotation
 xaxisPCA	PCA	principal component on x-axis
 yaxisPCA	PCA	principal component on y-axis
@@ -37,6 +35,8 @@ geneID_DE	Differential expression	last clicked gene ID
 geneSymbol_DE	Differential expression	last clicked gene symbol
 clusterFor	Time series clustering	perform clustering on selected data: expression, log fold-change, two-condition expression
 seleTreat_cluster	Time series clustering	select treatment condition
+addZero	Time series clustering	add zero timepoints
+seleZeroTreat	Time series clustering	select treatment from which to copy the zero timepoint data 
 seleTimeRange	Time series clustering	select the time points to include for clustering
 ifFilterFit	Time series clustering	filter genes based on spline fit test
 ifSplineFdr	Time series clustering	option to use FDR value
