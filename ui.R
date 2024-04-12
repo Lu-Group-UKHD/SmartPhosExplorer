@@ -220,9 +220,8 @@ navbarPage("SmartPhos explorer",
            # not consistent. Samples at different time points are linked by patient
            # ID if provided (PatID in fileTable). Currently, time points should 
            # have either no unit or "h" and/or "min" unit. The time points would
-           # have no unit in a future installment. 
-           # Future option: create an option to add a baseline time point to a 
-           # treatment by copying data from another treatment.
+           # have no unit in a future installment. Zero timepoint can also be added 
+           # when treatments with no zero timepoints are selected.
            tabPanel("Time series clustering",
                     titlePanel("Clustering of time series gene expression patterns"),
                     sidebarLayout(
@@ -249,7 +248,8 @@ navbarPage("SmartPhos explorer",
                         br(),
                         # plotSilhouette is currently disabled --------------------------------------------------------
                         # actionButton("plotSilhouette","Plot Silhouette and WSS scores", style = "background-color:salmon"),
-                        # h6("(Silhouette and WSS scores may help to select optimal cluster numbers. May take long time to calculate when number of genes is high.)")),
+                        # h6("(Silhouette and WSS scores may help to select optimal cluster numbers. 
+                        # May take long time to calculate when number of genes is high.)")),
                       ),
                       mainPanel(tags$style(type="text/css",
                                            ".shiny-output-error { visibility: hidden; }",
@@ -273,13 +273,16 @@ navbarPage("SmartPhos explorer",
            # are stored in the geneset folder (.gmt files) at the same directory
            # as the scripts of shiny app.
            # ---------------------
-           # For Phospho-signature enrichment: the method is available only for phosphoproteome data and use
-           # a site-centric database in which each set (signature set) has PTM sites and their direction of regulation
-           # instead of just protein names. The database were from Krug et al., 2019
-           # (https://doi.org/10.1074%2Fmcp.TIR118.000943) and stored (.txt) locally in the ptmset folder. 
-           # We use the PTM-SEA algorithm from Krug et al. to analyze the result from Differential Exression analysis
-           # and Fisher's exact test for the result from Time series cluster. For the latter, each signature set 
-           # is split into one containing the upregulated phosphosites and one containing the downregulated phosphosites.
+           # For Phospho-signature enrichment: the method is available only for 
+           # phosphoproteome data and use a site-centric database in which each
+           # set (signature set) has PTM sites and their direction of regulation
+           # instead of just protein names. The database are from Krug et al.,2019
+           # (https://doi.org/10.1074%2Fmcp.TIR118.000943) and stored locally in 
+           # the ptmset folder. We use the PTM-SEA algorithm from Krug et al. to
+           # analyze the result from Differential Exression analysis and Fisher's
+           # exact test for the result from Time series cluster. For the latter, 
+           # each signature set is split into one containing the upregulated
+           # phosphosites and one containing the downregulated phosphosites.
            tabPanel("Enrichment analysis",
                     titlePanel("Enrichment analysis on result from Differential expression or Time-series clustering"),
                     sidebarLayout(
@@ -342,16 +345,20 @@ navbarPage("SmartPhos explorer",
                                 column(plotOutput("plot2",height = 500, width = 600), width =6)
                       ))),
            
-           # This tab performs kinase activity inference using decoupleR. From changes in abundance of phosphorylation sites between 2 conditions,
-           # it infers how active the responsible kinases are between 2 said conditions.
-           # A network of kinase ("source") and their phosphorylation targets were constructed using databases from OmnipathR. Note that 
-           # we remove interactions whose source is only ProtMapper. The network is constructed with data from either homo sapiens or mus musculus
-           # (other organisms can be added later).
-           # Next, result from either hypothesis testing or time-series clustering (logFC) are used to infer kinase activity with the function
-           # decoupler::run_wmean(). For hypothesis testing, user can choose to use either the t-statistics or logFC. For time-series clustering,
-           # only logFC is used
-           # The result is then displayed as either barplot (hypothesis testing) or heatmap (time-series clustering). Kinases whose p-values are 
-           # smaller than a pre-determined threshold (e.g., 0.05) are highlighted
+           # This tab performs kinase activity inference using decoupleR. From 
+           # changes in abundance of phosphorylation sites between 2 conditions,
+           # it infers how active the responsible kinases are between two said 
+           # conditions. A network of kinase ("source") and their phosphorylation
+           # targets were constructed using databases from OmnipathR. Note that 
+           # we remove interactions whose source is only ProtMapper. The network 
+           # is constructed with data from either homo sapiens or mus musculus.
+           # Result from hypothesis testing or time-series clustering (logFC) are
+           # used to infer kinase activity with the function decoupler::run_wmean().
+           # For hypothesis testing, user can choose to use either the t-statistics
+           # or logFC. For time-series clustering, only logFC is used. The result
+           # is displayed as barplot (hypothesis testing) or heatmap (time-series
+           # clustering). Kinases whose p-values are smaller than a pre-determined
+           # threshold (e.g., 0.05) are highlighted.
            tabPanel("Kinase activity inference",
                     titlePanel("Inferring kinase activity from hypothesis testing or time-series clustering result"),
                     sidebarLayout(

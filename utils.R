@@ -1,6 +1,6 @@
-# Helper functions
+# helper functions
 
-# Get the last symbol of a protein that has multiple gene symbols
+# get the last symbol of a protein that has multiple gene symbols
 getOneSymbol <- function(Gene) {
   outStr <- sapply(Gene, function(x) {
     sp <- str_split(x, ";")[[1]]
@@ -12,7 +12,7 @@ getOneSymbol <- function(Gene) {
 
 ########################################## Normalization Correction ######################################
 
-#helper function for median or mean normalization
+# function for median or mean normalization
 medianNorm <- function(x, method = "median") {
   if (method == "median") {
     mVal <- matrixStats::colMedians(x, na.rm=TRUE)
@@ -25,7 +25,7 @@ medianNorm <- function(x, method = "median") {
   return(x-mMat)
 }
 
-#function for performing normalization of FP and PP samples
+# function for performing normalization of FP and PP samples
 performCombinedNormalization <- function(maeData) {
   
   # get count matrix from FP samples
@@ -35,7 +35,7 @@ performCombinedNormalization <- function(maeData) {
   comFP <- rbind(protFP, phosFP)
   comFP <- comFP[rowSums(!is.na(comFP))>0,]
   
-  #perform median normalization and log2 transformation
+  # perform median normalization and log2 transformation
   comFP.norm <- medianNorm(log2(comFP))
   
   return(comFP.norm)
@@ -49,9 +49,12 @@ removePrefix <- function(name, prefix) {
 }
 
 getRatioMatrix <- function(maeData, normalization = FALSE, getAdjustedPP = FALSE) {
-  # Get the ratios of phospho-proteins (or peptides) intensity in PP samples devided by FP samples 
+  # Get the ratios of phospho-proteins (or peptides) intensity in PP samples 
+  # devided by FP samples 
   # maeData: multiAssayExpriment output from SmartPhos package
-  # normalization: whether normalization needs to be performed on fullProteome samples. Normalization is necessary normalization has not been performed by Spectronaut.
+  # normalization: whether normalization needs to be performed on fullProteome
+  # samples. Normalization is necessary if normalization has not been performed
+  # by Spectronaut.
   stopifnot(is.logical(normalization))
   
   if (!getAdjustedPP) {
@@ -61,20 +64,17 @@ getRatioMatrix <- function(maeData, normalization = FALSE, getAdjustedPP = FALSE
   }
   
   if (!normalization) {
-    
     phosFP <- log2(assay(maeData[,maeData$sampleType == "FullProteome"][["Phosphoproteome"]]))
-    
-  } else  {
-    
+  } 
+  else  {
     phosFP <- performCombinedNormalization(maeData)
-    
   }
   
-  #remove sample type prefix or suffix
+  # remove sample type prefix or suffix
   colnames(phosFP) <- removePrefix(colnames(phosFP),"FullProteome")
   colnames(phosPP) <- removePrefix(colnames(phosPP),"Phospho")
   
-  #get ratio matrix
+  # get ratio matrix
   allSmp <- intersect(colnames(phosFP), colnames(phosPP))
   allRow <- intersect(rownames(phosFP), rownames(phosPP))
   ratioMat <- phosPP[allRow, allSmp] - phosFP[allRow, allSmp]
@@ -85,7 +85,7 @@ getRatioMatrix <- function(maeData, normalization = FALSE, getAdjustedPP = FALSE
 }
 
 plotLogRatio <- function(maeData, normalization = FALSE) {
-  # Plot the log ration of PP/FP intensities
+  # plot the log ration of PP/FP intensities
     
   ratioMat <- getRatioMatrix(maeData, normalization)
   
@@ -110,11 +110,11 @@ plotLogRatio <- function(maeData, normalization = FALSE) {
 }
 
 checkRatioMat <- function(ratioMat, minOverlap = 3) {
-  #check the PP/FP ratio matrix and remove feature that do not meet requirements
+  # check the PP/FP ratio matrix and remove feature that do not meet requirements
     
   excludeSampleList <- c()
   
-  #are there any samples that don't have any phospho sites detect in both FP and PP samples?
+  # are there any samples that don't have any phospho sites detect in both FP and PP samples?
   noOverSmp <- colnames(ratioMat)[colSums(!is.na(ratioMat))==0]
   if (length(noOverSmp) >0) {
     warning(paste0("Below samples don't have phopho-peptides detected in both enriched (PP) and unenriched (FP) samples and therefore adjusting factor will set to 0 (no adjustment) for them:\n",
@@ -124,7 +124,7 @@ checkRatioMat <- function(ratioMat, minOverlap = 3) {
   
   ratioMat <- ratioMat[, !colnames(ratioMat) %in% noOverSmp]
   
-  #are there any samples don't have enough peptide overlap with other samples?
+  # are there any samples don't have enough peptide overlap with other samples?
   pairOverlap <- sapply(colnames(ratioMat), function(n) {
     subMat <- ratioMat[!is.na(ratioMat[,n]),]
     minOver <- min(colSums(!is.na(subMat)))
@@ -143,40 +143,40 @@ checkRatioMat <- function(ratioMat, minOverlap = 3) {
 
 runPhosphoAdjustment <- function(maeData, normalization = FALSE, minOverlap = 3, completeness = 0, ncore = 1 ) {
   
-  #function to opitmize
+  # function to opitmize
   esFun <- function(par, data) {
     comPair <- utils::combn(seq(length(par)), 2)
     sum(((data[comPair[1, ],] + par[comPair[1, ]]) - (data[comPair[2, ],] + par[comPair[2, ]]))^2/rowSums(!is.na(data[comPair[1,],] + data[comPair[2,],])), na.rm = TRUE)
   }
   
-  #get PP/FP ratio matrix
+  # get PP/FP ratio matrix
   ratioMat <- getRatioMatrix(maeData, normalization = normalization)
   adjFac <- structure(rep(0, length.out = ncol(ratioMat)), names = colnames(ratioMat))
   
-  #subset features according to completeness in the ratio matrix
+  # subset features according to completeness in the ratio matrix
   ratioMat <- ratioMat[rowSums(!is.na(ratioMat))/ncol(ratioMat) >= completeness,]
   
-  #sanity check to see if any samples need to be excluded
+  # sanity check to see if any samples need to be excluded
   excList <- checkRatioMat(ratioMat)
   ratioMat <- ratioMat[, !colnames(ratioMat) %in% excList]
   
-  #set an initial value for B based on col medians of ratioMat, may increase search speed
+  # set an initial value for B based on col medians of ratioMat, may increase search speed
   colMed <- apply(ratioMat,2, median, na.rm = TRUE)
   iniPar <- median(colMed) - colMed
   
-  #estimating adjusting factor
+  # estimating adjusting factor
   cl <- makeCluster(ncore)
   setDefaultCluster(cl = cl)
   optRes <- optimParallel(par=iniPar, fn=esFun, data=t(ratioMat))
   stopCluster(cl)
   
-  #add adjusting factor to sample annotation  
+  # add adjusting factor to sample annotation  
   adjFac[names(optRes$par)] <- optRes$par
   ppName <- colnames(maeData[,maeData$sampleType == "Phospho"][["Phosphoproteome"]])
   adjFac <- structure(adjFac[removePrefix(ppName,"Phospho")], names = ppName)
   maeData$adjustFactorPP <- unname(adjFac[match(rownames(colData(maeData)),names(adjFac))])
   
-  #adjust phospho measurement on PP samples
+  # adjust phospho measurement on PP samples
   phosMat <- assay(maeData[,maeData$sampleType == "Phospho"][["Phosphoproteome"]])
   phosMat <- t(t(phosMat)*(2^adjFac))
   assays(maeData[["Phosphoproteome"]])[["Intensity_adjusted"]] <- assays(maeData[["Phosphoproteome"]])[["Intensity"]]
@@ -191,7 +191,7 @@ plotAdjustmentResults <- function(maeData, normalization = FALSE) {
     stop("Phosphorylation measurments have not been adjusted yet. Please perform normalization adjustment using calcAdjustFacotr function first")
   }
   
-  #visualize precursors 
+  # visualize precursors 
   ratioMat.ori <- getRatioMatrix(maeData, normalization = normalization, getAdjustedPP = FALSE)
   ratioMat.adj <- getRatioMatrix(maeData, normalization = normalization, getAdjustedPP = TRUE)
   ratioPlotTab <- bind_rows(pivot_longer(as_tibble(ratioMat.ori, rownames = "id"), -id, names_to = "sample", values_to = "ratio") %>% mutate(adjustment = "before adjustment"),
@@ -199,7 +199,7 @@ plotAdjustmentResults <- function(maeData, normalization = FALSE) {
     mutate(adjustment = factor(adjustment, levels = c("before adjustment","after adjustment"))) %>%
     filter(!is.na(ratio))
   
-  #for precursors present in all samples
+  # for precursors present in all samples
   featureComplete <- rownames(ratioMat.ori)[complete.cases(ratioMat.ori)]
   if (!length(featureComplete) >0) {
     warning("No feature (PP/FP ratio) has been detected in all samples. Raio trend line plot of will not be generated")
@@ -216,7 +216,7 @@ plotAdjustmentResults <- function(maeData, normalization = FALSE) {
       xlab("") + ylab("log2(PP/FP) ratio") 
   }
   
-  #for ratio box plots
+  # for ratio box plots
   medTab <- group_by(ratioPlotTab, adjustment) %>%
     summarise(medVal = median(ratio, na.rm=TRUE))
   ratioBoxplot <- ggplot(ratioPlotTab, aes(x=sample, y=ratio, fill = adjustment)) +
@@ -229,7 +229,7 @@ plotAdjustmentResults <- function(maeData, normalization = FALSE) {
     ggtitle("Box plot of all PP/FP ratios")  
   
   
-  #for phosphomeasurement of PP samples before and after adjustment
+  # for phosphomeasurement of PP samples before and after adjustment
   
   ppMat.adj <- assays(maeData[,maeData$sampleType == "Phospho"][["Phosphoproteome"]])[["Intensity_adjusted"]] 
   ppMat.ori <- assays(maeData[,maeData$sampleType == "Phospho"][["Phosphoproteome"]])[["Intensity"]] 
@@ -257,10 +257,7 @@ plotAdjustmentResults <- function(maeData, normalization = FALSE) {
 }
 
 
-
-###########################################################################################################
-
-# Function to preprocess proteomic data
+# function to preprocess proteomic data
 preprocessProteome <- function(seData, filterList = NULL, missCut = 50,
                                transform = "log2", normalize = FALSE, getPP = FALSE,
                                removeOutlier = NULL, impute = "QRILC", batch = NULL,
@@ -272,11 +269,11 @@ preprocessProteome <- function(seData, filterList = NULL, missCut = 50,
   # getPP, is whether to get PP sample instead of default FP samples
   # removeOutlier, can be a character vector contains the outlier samples to be removed from preprocessing.
   # verbose,  whether to show additional information
-  # scaleFactor, for user-specified scale factor. Not useful for the shiny app for now. Remove it or keep it as NULL.
+  # scaleFactor, for user-specified scale factor. Not useful for the shiny app for now.
   
   if (getPP) {
     # normally only full proteome samples (FP) are used for protein analysis.
-    # But if the user wishes, PP samples can also be retrieved. 
+    # but if the user wishes, PP samples can also be retrieved. 
     fpe <- seData[,seData$sampleType == "Phospho"]
     colData(fpe) <- colData(seData)[colnames(fpe),]
   } else {
@@ -411,7 +408,8 @@ preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
   
   if (is.null(assayName)) {
     if (getFP) { 
-      # normally PP samples are used for phosphoproteomic, but if the user wishes, FP sample can be used.
+      # normally PP samples are used for phosphoproteomic, but if the user wishes,
+      # FP sample can be used.
       ppe <- seData[,seData$sampleType == "FullProteome"]
       colData(ppe) <- colData(seData)[colnames(ppe),]
     } else {
@@ -585,7 +583,7 @@ clusterTS <- function(x, k, pCut = NULL, twoCondition = FALSE) {
     timeVector <- unique(colnames(x.center))
     timeUnit <- str_extract(timeVector, "h|min")
     timeUnit <- ifelse(is.na(timeUnit), "", timeUnit)
-    # If both h and min are present, divide the min time points by 60
+    # if both h and min are present, divide the min time points by 60
     if ((any(timeUnit == "h")) & (any(timeUnit == "min"))) {
       timeValue <- timeVector
       timeValue[timeUnit == "min"] <- 1/60 * as.numeric(gsub("min", "", timeValue[timeUnit == "min"]))
@@ -629,7 +627,7 @@ clusterTS <- function(x, k, pCut = NULL, twoCondition = FALSE) {
     timeVector <- unique(timeVector)
     timeUnit <- str_extract(timeVector, "h|min")
     timeUnit <- ifelse(is.na(timeUnit), "", timeUnit)
-    # If both h and min are present, divide the min time points by 60
+    # if both h and min are present, divide the min time points by 60
     if ((any(timeUnit == "h")) & (any(timeUnit == "min"))) {
       timeValue <- timeVector
       timeValue[timeUnit == "min"] <- 1/60 * as.numeric(gsub("min", "", timeValue[timeUnit == "min"]))
@@ -672,13 +670,14 @@ clusterTS <- function(x, k, pCut = NULL, twoCondition = FALSE) {
   return(list(cluster = clusterTab, plot = p))
 }
 
+
 # Function to filter genes based on spline fitting to remove changes that are not
 # consistent. If patient IDs are available (recognized by "subjectID" in fileTable),
 # then the changes among patients are taken into account, otherwise the
 # replicates are considered independent.
 splineFilter <- function(exprMat, subjectID = NULL, time, df, pCut, ifFDR, treatment = NULL, refTreatment = NULL) {
-  # The time points must have either no unit or in h and/or minute. 
-  # If both h and min are present, the minute time points will be converted to h
+  # the time points must have either no unit or in h and/or minute. 
+  # if both h and min are present, the minute time points will be converted to h
   if ((all(str_ends(time,"h|min"))) & (!all(str_ends(time,"h"))) & (!all(str_ends(time,"min")))) {
     time[str_ends(time, "min")] <- 1/60 * as.numeric(gsub("min","", time[str_ends(time, "min")]))
   }
@@ -778,11 +777,11 @@ mscale <- function(x, center = TRUE, scale = TRUE, censor = NULL, useMad = FALSE
 }
 
 # function to run fisher test for enrichment analysis (time series clustering only)
-## Note: gmtFile is the directory to the .gmt file for pathway enrichment analysis but is also the directory
-##       to the .txt file containing the PTM database, if ptm == TRUE
-## Processing the database file will depend on whether the file is geneset or ptm set.
-## If ptm == TRUE, the ptmset will be used, and each geneset will be split into 2 based on the sites direction
-## of regulation (up or down)
+# Note: gmtFile is the directory to the .gmt file for pathway enrichment analysis
+# but is also the directory to the .txt file containing the PTM database, if
+# ptm == TRUE Processing the database file will depend on whether the file is
+# geneset or ptm set. If ptm == TRUE, the ptmset will be used, and each geneset
+# will be split into 2 based on the sites direction of regulation (up or down).
 runFisher <- function (genes, reference, gmtFile, ptm = FALSE) {
   # retrieve the database
   if (!ptm) {
@@ -803,7 +802,8 @@ runFisher <- function (genes, reference, gmtFile, ptm = FALSE) {
   }
   reference = reference[!reference %in% genes]
   
-  rtab = lapply(setList, function(i) { # here i is the order number of a set in geneset or the name of the set in  ptm set.
+  rtab = lapply(setList, function(i) { 
+    # here i is the order number of a set in geneset or the name of the set in ptm set.
     if (!ptm) {
       geneset = genesets[[i]]
       nameSet = names(genesets)[i]
@@ -844,7 +844,7 @@ runFisher <- function (genes, reference, gmtFile, ptm = FALSE) {
 ## a network of kinase- phosphorylation site interactions
 getDecouplerNetwork <- function(speciesRef) {
    
-  # Load network of kinase-substrate interaction from omnipathR_kinase_network folder
+  # load network of kinase-substrate interaction from omnipathR_kinase_network folder
   if (speciesRef == "Homo sapiens") {
     decoupler_network <- read.table("omnipathR_kinase_network/Homo_sapiens.tsv", sep = "\t", stringsAsFactors = FALSE)
   } else if (speciesRef == "Mus musculus") {

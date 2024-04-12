@@ -115,7 +115,7 @@ SmartPhos package performs some pre-filtering and preprocessing based on various
 * **Transformation**: The transformation methods available are: log2 and vst (variance stabilizing transformation).
 * **Normalization**: Normalization strategy depends on the selected transformation method. Therefore, the user has option of *Yes* or *No*. If the user selects *Yes*, then for log2 and no transformation, *median scaling* is applied and for vst, *vsn* is applied. 
 * **Missing values**: Users can select what percentage of missing values are allowed. Proteins with missing values above the selected threshold will be removed from all analyses.
-* **Imputation**: Currently three imputation methods are available: 
+* **Imputation**: Currently four imputation methods are available: 
   + QRILC (Quantile Regression Imputation of Left-Censored data)
   + BPCA (Bayesian PCA)
   + MLE (Maximum Likelihood Estimation)
@@ -200,12 +200,12 @@ NOTE: If imputation is selected *none* in the preprocessing tab, then performing
 
 This tabs allow the user to plot the heatmap of the imputed assay from the preprocessing tab. Users can select from the three choices available:
 
-```{r, out.width="450px"}
-knitr::include_graphics("images/14.png")
+```{r, out.width="500px"}
+knitr::include_graphics("images/heatmap.png")
 ```
 
 * **Top variant**: This allows the users to plot the genes with highest variance. Users can decide the number of top variants genes to plot. This option performs clustering automatically. The user also has the option to divide the columns and rows of the heatmap into specific number of clusters. 
-* **Differentially expressed**: Allows to plot the heatmaps for differentially expressed genes. The differential expression analysis is available in *hypothesis testing* tab and can be performed using ProDA or Limma. 
+* **Differentially expressed**: Allows to plot the heatmaps for differentially expressed genes. The differential expression analysis is available in *Differential expression* tab and can be performed using ProDA or Limma. 
 * **Selected time series cluster**: After performing the time-series clustering in another tab, users have option to plot the heatmap of the selected cluster.
 
 For all the above-mentioned options, users can add additional column annotations to the plotted heatmap. Adding more column annotations to the heatmap can be helpful to understand the heatmap better and see the patterns in the data more clearly. User can also download the heatmap as a PDF. 
