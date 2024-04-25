@@ -74,6 +74,13 @@ shinyServer(function(input, output, session) {
     mae(readRDS(paste0("save/", input$seleFile)))
   })
   
+  # download the multiAssayExperiment object
+  output$download <- downloadHandler(
+    filename = function() { paste0(input$text, "_", format(Sys.Date(), "%Y%m%d"), ".Rds") },
+    content = function(file) {
+      saveRDS(mae(), file = file)
+    })
+  
   # zip file
   observeEvent(input$uploadZip, {
     inputsValue$upload <- input$upload
@@ -324,6 +331,20 @@ shinyServer(function(input, output, session) {
       inputsValue$impute <- input$impute
     })
   })
+  
+  # render download link if the summarized experiment object is created
+  output$downloadSE <- renderUI({
+    if (!is.null(processedDataUF())) {
+      downloadLink('downloadSEobj', 'Download the assay as summarized experiment object')
+    } 
+  })
+  
+  # download summarized experiment object
+  output$downloadSEobj <- downloadHandler(
+    filename = function() { paste0("summarizedExp", "_", format(Sys.Date(), "%Y%m%d"), ".Rds") },
+    content = function(file) {
+      saveRDS(processedDataUF(), file = file)
+    })
   
   # text output to show the number of samples and features
   output$dataInfo <- renderUI({
@@ -1707,7 +1728,8 @@ shinyServer(function(input, output, session) {
   
   ################################## Enrichment analysis on DE or time-series clustering result #############################
   
-  ####Widgets
+  # reactiveVal for file path
+  filePath <- reactiveVal(value = NULL)
   
   # to store the color values used to show gene sets that contain a certain gene
   colorList <- reactiveValues(cols = c())
@@ -1717,6 +1739,23 @@ shinyServer(function(input, output, session) {
   
   # a value to check whether enrichment tab is clicked
   clickRecord <- reactiveValues(enrich = FALSE, gene = FALSE, kinase = FALSE)
+  
+  # if user upload a gene set database
+  observeEvent(input$uploadGeneSet, {
+    file <- input$uploadGeneSet
+    ext <- tools::file_ext(file$datapath)
+    req(file)
+    validate(need(ext %in% c("gmt"), "Please upload a .gmt file"))
+    filePath(file$datapath)
+  })
+  # if user upload an PTM set database
+  observeEvent(input$uploadPTMSet, {
+    file <- input$uploadPTMSet
+    ext <- tools::file_ext(file$datapath)
+    req(file)
+    validate(need(ext %in% c("txt"), "Please upload a .txt file"))
+    filePath(file$datapath)
+  })
   
   # function to run GSEA 
   # Note: the analysisMethod is default to Pathway enrichment if the Proteome
@@ -1730,8 +1769,13 @@ shinyServer(function(input, output, session) {
           # set color list to empty
           colorList$cols <- NULL
           # reading geneset database
-          inputsValue$sigSet <- input$sigSet
-          inGMT <- loadGSC(paste0("geneset/",input$sigSet),type="gmt")
+          if(input$seleGeneSet == "select from available gene set databases") {
+            inGMT <- loadGSC(paste0("geneset/",input$sigSet),type="gmt")
+            inputsValue$sigSet <- input$sigSet
+          }
+          else {
+            inGMT <- loadGSC(filePath(),type="gmt")
+          }
           # method
           inputsValue$enrichMethod <- input$enrichMethod
           gseMethod <- input$enrichMethod
@@ -1816,14 +1860,20 @@ shinyServer(function(input, output, session) {
           # set color list to empty
           colorList$cols <- NULL
           # reading geneset database
-          inGMT <- loadGSC(paste0("geneset/",input$sigSet),type="gmt")
+          if(input$seleGeneSet == "select from available gene set databases") {
+            inGMT <- loadGSC(paste0("geneset/",input$sigSet),type="gmt")
+            inputsValue$sigSet <- input$sigSet
+          }
+          else {
+            inGMT <- loadGSC(filePath(),type="gmt")
+          }
           # Applying the Fisher's exact test with the runFisher function from utils.
           # Other enrichment methods can be added here
           if (input$enrichMethod1 == "Fisher's exact test")
             inputsValue$enrichMethod1 <- input$enrichMethod1
             resTab <- runFisher(unique(selectedCluster()$Gene),
                                 reference = unique(rowData(processedData())$Gene),
-                                gmtFile = paste0("geneset/", input$sigSet)) %>%
+                                inputSet = inGMT) %>%
             arrange(pval)
           # Filter by the p-value threshold (input$sigLevel)
           if (input$ifEnrichFDR) {
@@ -1872,8 +1922,13 @@ shinyServer(function(input, output, session) {
                                  stringsAsFactors = FALSE)
           }
           # retrieve the phosphodatabase
-          inputsValue$sigSetPTM <- input$sigSetPTM
-          ptmSetDb <- read.table(paste0("ptmset/", input$sigSetPTM), header = TRUE, sep = "\t",stringsAsFactors = FALSE)
+          if(input$selePTMSet == "select from available PTM set databases") {
+            ptmSetDb <- read.table(paste0("ptmset/", input$sigSetPTM), header = TRUE, sep = "\t",stringsAsFactors = FALSE)
+            inputsValue$sigSetPTM <- input$sigSetPTM
+          }
+          else {
+            ptmSetDb <- read.table(filePath(), header = TRUE, sep = "\t",stringsAsFactors = FALSE)
+          }
           
           # perform GSEA
           inputsValue$permNum <- input$permNum
@@ -1918,11 +1973,18 @@ shinyServer(function(input, output, session) {
         withProgress(message = "Running enrichment analysis, please wait...", {
           # set color list to empty
           colorList$cols <- NULL
+          # get PTM set database
+          if(input$selePTMSet == "select from available PTM set databases") {
+            ptmSetDb <- read.table(paste0("ptmset/", input$sigSetPTM), header = TRUE, sep = "\t",stringsAsFactors = FALSE)
+            inputsValue$sigSetPTM <- input$sigSetPTM
+          }
+          else {
+            ptmSetDb <- read.table(filePath(), header = TRUE, sep = "\t",stringsAsFactors = FALSE)
+          }
           # Run the Fisher's exact test for sites in the cluster
-          inputsValue$sigSetPTM <- input$sigSetPTM
           resTab <- runFisher(genes = selectedCluster()$site,
                               reference = rowData(processedData())$site,
-                              gmtFile = paste0("ptmset/", input$sigSetPTM),
+                              inputSet = ptmSetDb,
                               ptm = TRUE) %>%
             rename(Site.number = "Gene.number")
           # Filter by the p-value threshold (input$sigLevel)
@@ -1993,16 +2055,29 @@ shinyServer(function(input, output, session) {
   # find gene sets that contain a certain gene
   setGene <- reactive({
     resTab <- GSEres$resTab
-    if (input$analysisMethod == "Pathway enrichment" | input$assay == "Proteome")
-      setList <- loadGSC(paste0("geneset/",input$sigSet),type="gmt")$gsc[resTab$Name] else {
-        setList <- read.table(paste0("ptmset/", input$sigSetPTM), sep = "\t", header = TRUE, stringsAsFactors = FALSE)
-        if (input$seleSourceEnrich == "Time series cluster")
-          setList <- setList %>% mutate(signature = ifelse(site.direction == "u", paste0(signature,"_upregulated"), paste0(signature, "_downregulated")))
-        setList <- setList %>% 
-          filter(signature %in% resTab$Name, 
-                 site.ptm == "p") %>%
-          separate(site.annotation, sep=":", into = c("site", "PubMedID"), extra = "merge", fill="right")
+    
+    if (input$analysisMethod == "Pathway enrichment" | input$assay == "Proteome") {
+      if(input$seleGeneSet == "select from available gene set databases") {
+        setList <- loadGSC(paste0("geneset/",input$sigSet),type="gmt")$gsc[resTab$Name]
       }
+      else {
+        setList <- loadGSC(filePath(),type="gmt")$gsc[resTab$Name]
+      }
+    }
+    else {
+      if(input$selePTMSet == "select from available PTM set databases") {
+        setList <- read.table(paste0("ptmset/", input$sigSetPTM), sep = "\t", header = TRUE, stringsAsFactors = FALSE)
+      }
+      else {
+        setList <- read.table(filePath(), sep = "\t", header = TRUE, stringsAsFactors = FALSE)
+      }
+      if (input$seleSourceEnrich == "Time series cluster")
+        setList <- setList %>% mutate(signature = ifelse(site.direction == "u", paste0(signature,"_upregulated"), paste0(signature, "_downregulated")))
+      setList <- setList %>% 
+        filter(signature %in% resTab$Name, site.ptm == "p") %>%
+        separate(site.annotation, sep=":", into = c("site", "PubMedID"), extra = "merge", fill="right")
+    }
+    
     if (input$seleSourceEnrich == "Differential expression") {
       if (input$analysisMethod == "Pathway enrichment" | input$assay == "Proteome")
         genes <- filterDE()$Gene else
@@ -2012,6 +2087,7 @@ shinyServer(function(input, output, session) {
         genes <- unique(selectedCluster()$Gene) else
           sites <- selectedCluster()$site
     }
+    
     if (input$analysisMethod == "Pathway enrichment" | input$assay == "Proteome")
       allSets <- sapply(genes, function(geneName) names(setList)[sapply(setList, function(x) geneName %in% x)]) else {
         allSets <- list()
@@ -2025,13 +2101,24 @@ shinyServer(function(input, output, session) {
   
   # list genes that enriched in a certain gene set
   gseaList <- reactive({
-    
     setName <- GSEres$resTab[as.integer(input$enrichTab_row_last_clicked), "Name"]
+    
     if (input$assay == "Proteome" | input$analysisMethod == "Pathway enrichment") {
-      geneList <- loadGSC(paste0("geneset/", input$sigSet), type = "gmt")$gsc[[setName]]
-    } 
+      if(input$seleGeneSet == "select from available gene set databases") {
+        geneList <- loadGSC(paste0("geneset/",input$sigSet),type="gmt")$gsc[[setName]]
+      }
+      else {
+        geneList <- loadGSC(filePath(),type="gmt")$gsc[[setName]]
+      }
+    }
+    
     else {
-      geneList <- read.table(paste0("ptmset/", input$sigSetPTM), header = T, sep = "\t", stringsAsFactors = F) 
+      if(input$selePTMSet == "select from available PTM set databases") {
+        geneList <- read.table(paste0("ptmset/", input$sigSetPTM), header = T, sep = "\t", stringsAsFactors = F) 
+      }
+      else {
+        geneList <- read.table(filePath(), header = T, sep = "\t", stringsAsFactors = F) 
+      }
       if (input$seleSourceEnrich == "Time series cluster")
         geneList <- geneList %>% mutate(signature = ifelse(site.direction == "u", paste0(signature,"_upregulated"), paste0(signature, "_downregulated")))
       geneList <- geneList %>%  

@@ -777,18 +777,17 @@ mscale <- function(x, center = TRUE, scale = TRUE, censor = NULL, useMad = FALSE
 }
 
 # function to run fisher test for enrichment analysis (time series clustering only)
-# Note: gmtFile is the directory to the .gmt file for pathway enrichment analysis
-# but is also the directory to the .txt file containing the PTM database, if
+# Note: inputSet is the gene set database or the PTM set database
 # ptm == TRUE Processing the database file will depend on whether the file is
 # geneset or ptm set. If ptm == TRUE, the ptmset will be used, and each geneset
 # will be split into 2 based on the sites direction of regulation (up or down).
-runFisher <- function (genes, reference, gmtFile, ptm = FALSE) {
+runFisher <- function (genes, reference, inputSet, ptm = FALSE) {
   # retrieve the database
   if (!ptm) {
-    genesets <- piano::loadGSC(gmtFile)$gsc
+    genesets <- inputSet$gsc
     setList <- 1:length(genesets)
   } else {
-    genesets <- read.table(gmtFile, sep = "\t", header = TRUE, stringsAsFactors = FALSE) %>%
+    genesets <- inputSet %>%
       filter(!grepl("KINASE", category)) %>%
       dplyr::as_tibble() %>%
       filter(site.ptm == "p") %>%
