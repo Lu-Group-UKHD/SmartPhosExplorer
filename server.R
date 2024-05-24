@@ -31,35 +31,10 @@ shinyServer(function(input, output, session) {
   
   # save calculated results
   observeEvent(input$save, {
-    # save the processed and filtered summarized experiment object
-    if (!is.null(processedData())) {
-      saveObj <- processedData()
-      fileName <- paste0(input$text, "_", format(Sys.Date(), "%Y%m%d"), ".Rds")
-      saveRDS(saveObj, file = paste0("save/", fileName))
-      saveList$file <- unique(c(saveList$file, fileName))
-      saveObj <- mae()
-      fileName <- paste0(input$text, "_mae_", format(Sys.Date(), "%Y%m%d"), ".Rds")
-      saveRDS(saveObj, file = paste0("save/", fileName))
-      saveList$file <- unique(c(saveList$file, fileName))
-    }
-    # save the processed summarized experiment object
-    else if (!is.null(processedDataUF())) {
-      saveObj <- processedDataUF()
-      fileName <- paste0(input$text, "_", format(Sys.Date(), "%Y%m%d"), ".Rds")
-      saveRDS(saveObj, file = paste0("save/", fileName))
-      saveList$file <- unique(c(saveList$file, fileName))
-      saveObj <- mae()
-      fileName <- paste0(input$text, "_mae_", format(Sys.Date(), "%Y%m%d"), ".Rds")
-      saveRDS(saveObj, file = paste0("save/", fileName))
-      saveList$file <- unique(c(saveList$file, fileName))
-    }
-    # save the multiAssayExperiment object
-    else if (!is.null(mae())) {
-      saveObj <- mae()
-      fileName <- paste0(input$text, "_", format(Sys.Date(), "%Y%m%d"), ".Rds")
-      saveRDS(saveObj, file = paste0("save/", fileName))
-      saveList$file <- unique(c(saveList$file, fileName))
-    }
+    saveObj <- mae()
+    fileName <- paste0(input$text, "_", format(Sys.Date(), "%Y%m%d"), ".Rds")
+    saveRDS(saveObj, file = paste0("save/", fileName))
+    saveList$file <- unique(c(saveList$file, fileName))
   })
   
   # remove saved file
@@ -335,7 +310,8 @@ shinyServer(function(input, output, session) {
   # render download link if the summarized experiment object is created
   output$downloadSE <- renderUI({
     if (!is.null(processedDataUF())) {
-      downloadLink('downloadSEobj', 'Download the assay as summarized experiment object')
+      downloadButton('downloadSEobj', 'Download the proceesed assay', 
+                     style="color: #FFFFFF; background-color: #3498DB; border-color: #2E86C1;")
     } 
   })
   
@@ -1735,7 +1711,7 @@ shinyServer(function(input, output, session) {
   colorList <- reactiveValues(cols = c())
   
   # a reactive variable to store GSE result
-  GSEres <- reactiveValues(resTab = NULL, resObj = NULL)
+  GSEres <- reactiveValues(resTab = NULL, resObj = NULL, enrPlot = NULL)
   
   # a value to check whether enrichment tab is clicked
   clickRecord <- reactiveValues(enrich = FALSE, gene = FALSE, kinase = FALSE)
@@ -1851,7 +1827,7 @@ shinyServer(function(input, output, session) {
         output$errMsg <- renderText("Please perform differential expression analysis first or load a previous result!")
       }
     } 
-    else if ((input$seleSourceEnrich =="Time series cluster") & (input$analysisMethod =="Pathway enrichment" || input$assay == "Proteome")) {
+    else if ((input$seleSourceEnrich =="Selected time-series cluster") & (input$analysisMethod =="Pathway enrichment" || input$assay == "Proteome")) {
       # Pathway enrichment for time series cluster 
       if (!is.null(selectedCluster())) {
         output$errMsg <- renderText("")
@@ -1900,7 +1876,31 @@ shinyServer(function(input, output, session) {
       } else {
         output$errMsg <- renderText("Please perform time series clustering first!")
       }
-    } 
+    }
+    else if ((input$seleSourceEnrich == "All time-series clusters") & (input$analysisMethod =="Pathway enrichment" || input$assay == "Proteome")) {
+      if (!is.null(clusterTabVal())) {
+        output$errMsg <- renderText("")
+        # withProgress("Running enrichment analysis, please wait..", {
+        #   
+        # })
+        if(input$seleGeneSet == "select from available gene set databases") {
+          database <- loadGSC(paste0("geneset/",input$sigSet),type="gmt")
+          inputsValue$sigSet <- input$sigSet
+        }
+        else {
+          database <- loadGSC(filePath(), type="gmt")
+        }
+        ptm <- FALSE
+        clustEnr <- clusterEnrich(clusterTab = clusterTabVal(), 
+                                  se = processedData(), inputSet = database,
+                                  ptm = ptm)
+        GSEres$resTab <- clustEnr$table
+        GSEres$enrPlot <- clustEnr$plot
+      }
+      else {
+        output$errMsg <- renderText("Please perform time series clustering first!")
+      }
+    }
     else if ((input$seleSourceEnrich == "Differential expression") & (input$analysisMethod == "Phospho-signature enrichment")){
       # Phospho-signature enrichment for differential expression 
       if ((!is.null(filterDE())) & (input$assay == "Phosphoproteome")) {
@@ -1966,7 +1966,7 @@ shinyServer(function(input, output, session) {
         })
       } else output$errMsg <- renderText("Please perform differential expression analysis first and make sure you have selected the Phosphoproteome assay!")
     } 
-    else if ((input$seleSourceEnrich == "Time series cluster") & (input$analysisMethod == "Phospho-signature enrichment")) {
+    else if ((input$seleSourceEnrich == "Selected time-series cluster") & (input$analysisMethod == "Phospho-signature enrichment")) {
       # Phospho-signature enrichment for Time-series clustering 
       if ((!is.null(selectedCluster())) & (input$assay == "Phosphoproteome")) {
         output$errMsg <- renderText("")
@@ -2011,11 +2011,36 @@ shinyServer(function(input, output, session) {
         })
       } else output$errMsg <- renderText("Please perform time series clustering first and make sure you have selected the Phopshoproteome assay!")
     }
+    else if ((input$seleSourceEnrich =="All time-series clusters") & (input$analysisMethod == "Phospho-signature enrichment")) {
+      if (!is.null(clusterTabVal())) {
+        output$errMsg <- renderText("")
+        # withProgress("Running enrichment analysis, please wait..", {
+        #   
+        # })
+        if(input$selePTMSet == "select from available PTM set databases") {
+          database <- read.table(paste0("ptmset/", input$sigSetPTM), 
+                                 header = TRUE, sep = "\t",stringsAsFactors = FALSE)
+          inputsValue$sigSet <- input$sigSet
+        }
+        else {
+          database <- read.table(filePath(), header = TRUE, 
+                                 sep = "\t",stringsAsFactors = FALSE)
+        }
+        ptm <- TRUE
+        clustEnr <- clusterEnrich(clusterTab = clusterTabVal(), 
+                                  se = processedData(), inputSet = database,
+                                  ptm = ptm)
+        GSEres$resTab <- clustEnr$table
+        GSEres$enrPlot <- clustEnr$plot
+      }
+      else {
+        output$errMsg <- renderText("Please perform time series clustering first!")
+      }
+    }
   })
   
   # show differential expressed genes or enrichment results on table 1 (up table)
   output$enrichTab <- DT::renderDataTable({
-    
     if( !is.null (GSEres$resTab)) {
       inputsValue$seleSourceEnrich <- input$seleSourceEnrich
       inputsValue$analysisMethod <- input$analysisMethod
@@ -2071,7 +2096,7 @@ shinyServer(function(input, output, session) {
       else {
         setList <- read.table(filePath(), sep = "\t", header = TRUE, stringsAsFactors = FALSE)
       }
-      if (input$seleSourceEnrich == "Time series cluster")
+      if (input$seleSourceEnrich == "Selected time-series cluster")
         setList <- setList %>% mutate(signature = ifelse(site.direction == "u", paste0(signature,"_upregulated"), paste0(signature, "_downregulated")))
       setList <- setList %>% 
         filter(signature %in% resTab$Name, site.ptm == "p") %>%
@@ -2101,64 +2126,66 @@ shinyServer(function(input, output, session) {
   
   # list genes that enriched in a certain gene set
   gseaList <- reactive({
-    setName <- GSEres$resTab[as.integer(input$enrichTab_row_last_clicked), "Name"]
-    
-    if (input$assay == "Proteome" | input$analysisMethod == "Pathway enrichment") {
-      if(input$seleGeneSet == "select from available gene set databases") {
-        geneList <- loadGSC(paste0("geneset/",input$sigSet),type="gmt")$gsc[[setName]]
+    if(!is.null(GSEres$resTab)) {
+      setName <- GSEres$resTab[as.integer(input$enrichTab_row_last_clicked), "Name"]
+      
+      if (input$assay == "Proteome" | input$analysisMethod == "Pathway enrichment") {
+        if(input$seleGeneSet == "select from available gene set databases") {
+          geneList <- loadGSC(paste0("geneset/",input$sigSet),type="gmt")$gsc[[setName]]
+        }
+        else {
+          geneList <- loadGSC(filePath(),type="gmt")$gsc[[setName]]
+        }
       }
+      
       else {
-        geneList <- loadGSC(filePath(),type="gmt")$gsc[[setName]]
+        if(input$selePTMSet == "select from available PTM set databases") {
+          geneList <- read.table(paste0("ptmset/", input$sigSetPTM), header = T, sep = "\t", stringsAsFactors = F) 
+        }
+        else {
+          geneList <- read.table(filePath(), header = T, sep = "\t", stringsAsFactors = F) 
+        }
+        if (input$seleSourceEnrich == "Selected time-series cluster")
+          geneList <- geneList %>% mutate(signature = ifelse(site.direction == "u", paste0(signature,"_upregulated"), paste0(signature, "_downregulated")))
+        geneList <- geneList %>%  
+          filter(signature == setName, site.ptm == "p") %>%
+          separate(site.annotation, sep=":", into = c("site", "PubMedID"), extra = "merge", fill="right")
       }
-    }
-    
-    else {
-      if(input$selePTMSet == "select from available PTM set databases") {
-        geneList <- read.table(paste0("ptmset/", input$sigSetPTM), header = T, sep = "\t", stringsAsFactors = F) 
-      }
-      else {
-        geneList <- read.table(filePath(), header = T, sep = "\t", stringsAsFactors = F) 
-      }
-      if (input$seleSourceEnrich == "Time series cluster")
-        geneList <- geneList %>% mutate(signature = ifelse(site.direction == "u", paste0(signature,"_upregulated"), paste0(signature, "_downregulated")))
-      geneList <- geneList %>%  
-        filter(signature == setName, site.ptm == "p") %>%
-        separate(site.annotation, sep=":", into = c("site", "PubMedID"), extra = "merge", fill="right")
-    }
-    
-    if (input$seleSourceEnrich == "Differential expression") {
-      # Differential expression
-      corGene <- filterDE()
-      if (input$analysisMethod == "Pathway enrichment" | input$assay == "Proteome") {
-        geneTab <- corGene[corGene$Gene %in% geneList,]
-        # setNum is the number of gene sets containing the gene in question
-        geneTab$setNum <- sapply(geneTab$Gene, function(x) length(setGene()[[x]]))
+      
+      if (input$seleSourceEnrich == "Differential expression") {
+        # Differential expression
+        corGene <- filterDE()
+        if (input$analysisMethod == "Pathway enrichment" | input$assay == "Proteome") {
+          geneTab <- corGene[corGene$Gene %in% geneList,]
+          # setNum is the number of gene sets containing the gene in question
+          geneTab$setNum <- sapply(geneTab$Gene, function(x) length(setGene()[[x]]))
+        } 
+        else {
+          geneTab <- corGene[corGene$site %in% geneList$site,]
+          geneTab <- merge(x = geneTab, y = geneList[,c("site","site.direction","PubMedID")], by = "site", all.x = TRUE)
+          # only select sites whose direction of regulation (up- or down-regulated) matches with the database
+          geneTab <- geneTab[((geneTab$log2FC >=0) & (geneTab$site.direction == "u")) | ((geneTab$log2FC < 0) & (geneTab$site.direction ==  "d")),]
+          geneTab$setNum <- sapply(geneTab$site, function(x) length(setGene()[[x]]))
+        }
+        geneTab <- select(geneTab, any_of(c("site", "Gene","log2FC", "pvalue", "padj", "setNum", "Sequence", "PubMedID", "ID")))
       } 
       else {
-        geneTab <- corGene[corGene$site %in% geneList$site,]
-        geneTab <- merge(x = geneTab, y = geneList[,c("site","site.direction","PubMedID")], by = "site", all.x = TRUE)
-        # only select sites whose direction of regulation (up- or down-regulated) matches with the database
-        geneTab <- geneTab[((geneTab$log2FC >=0) & (geneTab$site.direction == "u")) | ((geneTab$log2FC < 0) & (geneTab$site.direction ==  "d")),]
-        geneTab$setNum <- sapply(geneTab$site, function(x) length(setGene()[[x]]))
+        # time series cluster
+        corGene <- selectedCluster()
+        if (input$analysisMethod == "Pathway enrichment" | input$assay == "Proteome") {
+          geneTab <- corGene[corGene$Gene %in% geneList,]
+          # setNum is the number of gene sets containing the gene in question
+          geneTab$setNum <- sapply(geneTab$Gene, function(x) length(setGene()[[x]]))
+        } else {
+          geneTab <- corGene[corGene$site %in% geneList$site,]
+          geneTab <- merge(x = geneTab, y = geneList[,c("site","PubMedID")], by = "site", all.x = TRUE)
+          geneTab$setNum <- sapply(geneTab$site, function(x) length(setGene()[[x]]))
+        }
+        geneTab <- select(geneTab, any_of(c("site", "Gene", "cluster", "probability", "setNum", "Sequence", "PubMedID", "ID")))
       }
-      geneTab <- select(geneTab, any_of(c("site", "Gene","log2FC", "pvalue", "padj", "setNum", "Sequence", "PubMedID", "ID")))
-    } 
-    else {
-      # time series cluster
-      corGene <- selectedCluster()
-      if (input$analysisMethod == "Pathway enrichment" | input$assay == "Proteome") {
-        geneTab <- corGene[corGene$Gene %in% geneList,]
-        # setNum is the number of gene sets containing the gene in question
-        geneTab$setNum <- sapply(geneTab$Gene, function(x) length(setGene()[[x]]))
-      } else {
-        geneTab <- corGene[corGene$site %in% geneList$site,]
-        geneTab <- merge(x = geneTab, y = geneList[,c("site","PubMedID")], by = "site", all.x = TRUE)
-        geneTab$setNum <- sapply(geneTab$site, function(x) length(setGene()[[x]]))
-      }
-      geneTab <- select(geneTab, any_of(c("site", "Gene", "cluster", "probability", "setNum", "Sequence", "PubMedID", "ID")))
+      geneTab <- geneTab %>% mutate_if(is.numeric, formatC, digits = 2)
+      geneTab
     }
-    geneTab <- geneTab %>% mutate_if(is.numeric, formatC, digits = 2)
-    geneTab
   })
   
   # if the enrichtab is clicked, cancel the color
@@ -2185,7 +2212,7 @@ shinyServer(function(input, output, session) {
     }
   })
   
-  output$plot2 <- renderPlot({
+  output$plotEnr <- renderPlot({
     if (clickRecord$gene) {
       lastClicked <- input$geneTab_row_last_clicked
       geneID <- gseaList()[lastClicked,]$ID
@@ -2261,7 +2288,7 @@ shinyServer(function(input, output, session) {
             p
             
           }
-        } else if (input$seleSourceEnrich == "Time series cluster") {
+        } else if (input$seleSourceEnrich == "Selected time-series cluster") {
           
           if (input$clusterFor == "expression") {
             seqMat <- processedData()[,processedData()$treatment == input$seleTreat_cluster & processedData()$timepoint %in% input$seleTimeRange]
@@ -2338,9 +2365,57 @@ shinyServer(function(input, output, session) {
     } else { NULL }
   })
   
+  # render the cluster enrichment profile plot as interactively plotly plot
+  output$clustEnrPlot <- renderPlotly({
+    if(!is.null(GSEres$resTab)) {
+      p <- ggplotly(GSEres$enrPlot, source = "enrich") 
+      p %>% event_register("plotly_click")
+      #ggplotly(GSEres$enrPlot)
+      p
+    }
+  })
+  
+  # if a dot on the plot is clicked
+  observeEvent(event_data("plotly_click", source = "enrich"),{
+    d <- event_data("plotly_click", source = "enrich")
+    tab <- GSEres$resTab
+    name <- d$key
+    clusterSele <- d$customdata
+    genes <- tab[tab$Name == name & tab$cluster == clusterSele, ]$Genes
+    
+    selectedTab <- filter(clusterTabVal(), cluster == clusterSele) %>% 
+      distinct(feature, .keep_all = TRUE) %>%
+      mutate(feature = as.character(feature)) 
+    clusterData <- rowData(processedData()[selectedTab$feature,])
+    
+    # If the data is phosphoproteomic: include the columns indicating phosphorylation site and peptide sequence
+    if ((!is.null(clusterData$site)) & (!is.null(clusterData$Sequence))) {
+      selectedTab <- selectedTab %>%
+        mutate(Sequence = clusterData$Sequence,
+               site = clusterData$site)
+    }
+    selectedTab <- selectedTab %>% 
+      mutate(Gene = clusterData$Gene,
+             UniprotID = clusterData$UniprotID,
+             prob = formatC(prob, digits=1)) %>%
+      select(any_of(c("feature", "Gene", "site", "prob", "cluster", "UniprotID", "Sequence"))) %>%
+      arrange(desc(prob)) %>%
+      dplyr::rename(ID = feature, probability = prob)
+    if (input$analysisMethod == "Pathway enrichment") {
+      geneTab <- selectedTab[selectedTab$Gene %in% genes[[1]],]
+    }
+    else {
+      geneTab <- selectedTab[selectedTab$site %in% genes[[1]],]
+    }
+    
+    output$geneTabClicked <- DT::renderDataTable({
+      datatable(geneTab, selection = "single")
+    })
+  })
+  
   # link for download the enriched set list
   output$downloadUI1 <- renderUI({
-    if( !is.null (GSEres$resTab)) {
+    if(!is.null(GSEres$resTab)) {
       downloadLink("downloadSet", "Download enriched set list")
     }
   })

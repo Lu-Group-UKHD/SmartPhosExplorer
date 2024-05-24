@@ -810,6 +810,7 @@ runFisher <- function (genes, reference, inputSet, ptm = FALSE) {
       geneset = genesets[genesets$signature == i, "site"]
       nameSet = i
     }
+    
     RinSet = sum(reference %in% geneset)
     RninSet = length(reference) - RinSet
     GinSet = sum(genes %in% geneset)
@@ -824,13 +825,53 @@ runFisher <- function (genes, reference, inputSet, ptm = FALSE) {
     tibble(Name = nameSet,
            `Gene.number`= GinSet, 
            `Set.size` = inSet, 
-           pval = pval)
+           pval = pval,
+           Genes = list(intersect(genes, geneset)))
   }) %>% bind_rows() %>%
     filter(Set.size>0) %>%
     mutate(padj = p.adjust(pval, method = "BH")) %>%
     arrange(pval)
   
   return(data.frame(rtab))
+}
+
+#perform enrichment for each cluster
+clusterEnrich <- function(clusterTab, se, inputSet, reference = NULL, ptm = FALSE, adj = "BH", fdrCut =0.1) {
+  if (is.null(reference)) {
+    if (ptm) {
+      reference <- rowData(se)$site
+    }
+    else {
+      reference <- unique(rowData(se)$Gene)
+    }
+  } 
+  resTabFisher <- lapply(unique(clusterTab$cluster), function(cc) {
+    id <- filter(clusterTab, cluster == cc)$feature
+    if (ptm) {
+      genes <- unique(elementMetadata(se)[id,]$site)
+    }
+    else {
+      genes <- unique(elementMetadata(se)[id,]$Gene)
+    }
+    eachOut <- runFisher(genes, reference, inputSet, ptm) %>%
+      mutate(cluster = cc)
+  }) %>% bind_rows()
+  
+  plotTab <- resTabFisher %>%
+    mutate(ifSig = padj <= fdrCut) %>%
+    group_by(Name) %>% mutate(atLeast1 = sum(ifSig)>0) %>%
+    filter(atLeast1) %>% ungroup()
+  
+  p<- ggplot(plotTab, aes(x=cluster, y=Name, customdata = cluster, key = Name)) +
+    geom_point(aes(size =-log10(pval),fill=-log10(pval), color = ifSig), shape = 21) +
+    scale_fill_gradient(low = "white", high = "red") +
+    scale_color_manual(values = list(`TRUE` = "black", `FALSE` = "white")) +
+    xlab("Cluster") +
+    ylab("Pathway") +
+    theme(axis.text.x = element_text(size = 12),
+          axis.text.y = element_text(size = 12),
+          plot.title = element_text(hjust = 0.5, face = "bold"))
+  return(list(table = resTabFisher, plot = p))
 }
 
 ###### Helper functions for kinase activity inference ################
