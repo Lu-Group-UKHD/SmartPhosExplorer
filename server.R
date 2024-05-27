@@ -1716,6 +1716,9 @@ shinyServer(function(input, output, session) {
   # a value to check whether enrichment tab is clicked
   clickRecord <- reactiveValues(enrich = FALSE, gene = FALSE, kinase = FALSE)
   
+  # a reactive variable to save gene table of a clicked dot in cluster enrichment profile
+  geneTable <- reactiveVal()
+  
   # if user upload a gene set database
   observeEvent(input$uploadGeneSet, {
     file <- input$uploadGeneSet
@@ -2307,7 +2310,7 @@ shinyServer(function(input, output, session) {
               }) %>% bind_cols() %>% as.matrix()
             } else {
               fcMat <- lapply(unique(seqMat$timepoint), function(tp) {
-                RefMean = rowMeans(assay(RefMat)[,refMat$timepoint == tp]) 
+                RefMean = rowMeans(assay(RefMat)[,RefMat$timepoint == tp]) 
                 assay(seqMat)[,seqMat$timepoint == tp] - RefMean
               }) %>% bind_cols() %>% as.matrix()
             } 
@@ -2402,15 +2405,100 @@ shinyServer(function(input, output, session) {
       arrange(desc(prob)) %>%
       dplyr::rename(ID = feature, probability = prob)
     if (input$analysisMethod == "Pathway enrichment") {
-      geneTab <- selectedTab[selectedTab$Gene %in% genes[[1]],]
+      geneTable <- selectedTab[selectedTab$Gene %in% genes[[1]],]
     }
     else {
-      geneTab <- selectedTab[selectedTab$site %in% genes[[1]],]
+      geneTable <- selectedTab[selectedTab$site %in% genes[[1]],]
     }
     
+    geneTable(geneTable)
+    
     output$geneTabClicked <- DT::renderDataTable({
-      datatable(geneTab, selection = "single")
+      datatable(geneTable, selection = "single")
     })
+  })
+  
+  # when a row from gene table is clicked 
+  observeEvent(input$geneTabClicked_row_last_clicked,{
+    lastClicked <- input$geneTabClicked_row_last_clicked
+    geneID <- geneTable()[lastClicked,]$ID
+    inputsValue$geneIDenrich <- geneID
+    if (input$assay == "Phosphoproteome")
+      geneSymbol <- geneTable()[lastClicked,]$site else
+        geneSymbol <- geneTable()[lastClicked,]$Gene
+    inputsValue$geneSymbolenrich <- geneSymbol
+    
+    if (input$clusterFor == "expression") {
+      seqMat <- processedData()[,processedData()$treatment == input$seleTreat_cluster & processedData()$timepoint %in% input$seleTimeRange]
+      yLabText <- "Normalized expression"
+    } else if (input$clusterFor == "logFC"){
+      seqMat <- processedData()[,processedData()$treatment == input$seleTreat_cluster & processedData()$timepoint %in% input$seleTimeRange]
+      RefMat <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & processedData()$timepoint %in% input$seleTimeRange]
+      # calculate fold change by subtracting assayMat to mean intensities of RefMat
+      #  here the mean intensities in RefMat are calculated per time point or per time point and subject ID (if provided).
+      if (!is.null(processedData()$subjectID)) {
+        fcMat <- lapply(unique(seqMat$timepoint), function(tp) {
+          lapply(unique(seqMat$subjectID), function(id) {
+            RefMean = rowMeans(assay(RefMat)[,RefMat$timepoint == tp & RefMat$subjectID == id]) 
+            assay(seqMat)[,seqMat$timepoint == tp & seqMat$subjectID == id] - RefMean
+          })
+        }) %>% bind_cols() %>% as.matrix()
+      } else {
+        fcMat <- lapply(unique(seqMat$timepoint), function(tp) {
+          RefMean = rowMeans(assay(RefMat)[,RefMat$timepoint == tp]) 
+          assay(seqMat)[,seqMat$timepoint == tp] - RefMean
+        }) %>% bind_cols() %>% as.matrix()
+      } 
+      rownames(fcMat) <- rownames(assay(seqMat))
+      # rearrange columns in seq to match with fcMat to assign the fold change
+      seqMat <- seqMat[,colnames(fcMat)]
+      # assign fcMat to assay(seqMat)
+      assay(seqMat) <- fcMat
+      yLabText <- "logFC"
+    } else if (input$clusterFor == "two-condition expression") {
+      seqMat <- processedData()[,processedData()$treatment %in% c(input$seleTreat_cluster,input$seleTreat_clusterRef) & processedData()$timepoint %in% input$seleTimeRange]
+      yLabText <- "Normalized expression"
+    }
+    # Time points are treated as numerical values and not characters (this might change in the future)
+    # if both h and min are used as time unit, convert the minute ones to h (this might be removed in the future)
+    if ((any(str_ends(seqMat$timepoint, "h"))) & (any(str_ends(seqMat$timepoint, "min")))) {
+      ifMinToH <- TRUE
+    } else ifMinToH <- FALSE
+    if (is.null(seqMat$subjectID)) {
+      plotTab <- data.frame(time = seqMat$timepoint,
+                            value = assays(seqMat)[["Intensity"]][geneID,],
+                            treatment = as.character(seqMat$treatment))
+      # convert the time column to a numerical variable and convert the minute time points ('min') to hour ('h')
+      if (ifMinToH) {
+        plotTab$time[str_ends(plotTab$time, "min")] <- 1/60 * as.numeric(gsub("min","",plotTab$time[str_ends(plotTab$time, "min")]))
+      }
+      plotTab$time <- as.numeric(gsub("h|min","", plotTab$time))
+      p <- ggplot(plotTab, aes(x= time, y = value)) +
+        geom_point(aes(color = treatment), size=3) +
+        stat_summary(aes(color=paste("mean",treatment)),fun = mean, geom = "line", linewidth = 2)
+    } else {
+      plotTab <- data.frame(time = seqMat$timepoint,
+                            value = assays(seqMat)[["Intensity"]][geneID,], 
+                            subjectID = seqMat$subjectID,
+                            treatment = as.character(seqMat$treatment)) %>%
+        mutate(patCondi = paste0(subjectID,"_",treatment))
+      # convert the time column to a numerical variable and convert the minute time points ('min') to hour ('h')
+      if (ifMinToH) {
+        plotTab$time[str_ends(plotTab$time, "min")] <- 1/60 * as.numeric(gsub("min", "", plotTab$time[str_ends(plotTab$time, "min")]))
+      }
+      plotTab$time <- as.numeric(gsub("h|min","", plotTab$time))
+      p <- ggplot(plotTab, aes(x= time, y = value, color = paste0(subjectID,"_",treatment))) +
+        geom_point(size=3) + 
+        stat_summary(fun = mean, geom = "line", linewidth = 1,linetype = "dashed")
+    }
+    p <- p + 
+      ylab(yLabText) + xlab("time") + 
+      ggtitle(geneSymbol) + theme_bw() + 
+      theme(text = element_text(size=15), plot.title = element_text(hjust = 0.5),
+            legend.position = "bottom",
+            axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5, size = 15))
+    p
+    output$plotGeneEnr <- renderPlot(p)
   })
   
   # link for download the enriched set list
