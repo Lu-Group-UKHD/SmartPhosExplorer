@@ -871,7 +871,7 @@ clusterEnrich <- function(clusterTab, se, inputSet, reference = NULL, ptm = FALS
     theme(axis.text.x = element_text(size = 12),
           axis.text.y = element_text(size = 12),
           plot.title = element_text(hjust = 0.5, face = "bold"))
-  return(list(table = resTabFisher, plot = p))
+  return(list(table = plotTab, plot = p))
 }
 
 ###### Helper functions for kinase activity inference ################

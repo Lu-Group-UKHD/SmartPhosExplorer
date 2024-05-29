@@ -1740,7 +1740,7 @@ shinyServer(function(input, output, session) {
   # Note: the analysisMethod is default to Pathway enrichment if the Proteome
   # assay is selected (might change in the future!)
   resGSEA <- observeEvent(input$RunEnrich, {
-    if ((input$seleSourceEnrich == "Differential expression") & (input$analysisMethod == "Pathway enrichment" || input$assay == "Proteome")) {
+    if (input$seleSourceEnrich == "Differential expression" & input$analysisMethod == "Pathway enrichment") {
       # Pathway enrichment for differential expression 
       if (!is.null(filterDE())) {
         output$errMsg <- renderText("")
@@ -1830,9 +1830,9 @@ shinyServer(function(input, output, session) {
         output$errMsg <- renderText("Please perform differential expression analysis first or load a previous result!")
       }
     } 
-    else if ((input$seleSourceEnrich =="Selected time-series cluster") & (input$analysisMethod =="Pathway enrichment" || input$assay == "Proteome")) {
+    else if (input$seleSourceEnrich =="Selected time-series cluster" & input$analysisMethod =="Pathway enrichment") {
       # Pathway enrichment for time series cluster 
-      if (!is.null(selectedCluster())) {
+      if (nrow(selectedCluster()) > 0) {
         output$errMsg <- renderText("")
         withProgress(message = "Running enrichment analysis, please wait...", {
           
@@ -1880,8 +1880,8 @@ shinyServer(function(input, output, session) {
         output$errMsg <- renderText("Please perform time series clustering first!")
       }
     }
-    else if ((input$seleSourceEnrich == "All time-series clusters") & (input$analysisMethod =="Pathway enrichment" || input$assay == "Proteome")) {
-      if (!is.null(clusterTabVal())) {
+    else if (input$seleSourceEnrich == "All time-series clusters" & input$analysisMethod =="Pathway enrichment") {
+      if (nrow(clusterTabVal()) > 0) {
         output$errMsg <- renderText("")
         # withProgress("Running enrichment analysis, please wait..", {
         #   
@@ -1897,8 +1897,18 @@ shinyServer(function(input, output, session) {
         clustEnr <- clusterEnrich(clusterTab = clusterTabVal(), 
                                   se = processedData(), inputSet = database,
                                   ptm = ptm)
-        GSEres$resTab <- clustEnr$table
-        GSEres$enrPlot <- clustEnr$plot
+        if (nrow(clustEnr$table) > 0) {
+          GSEres$resTab <- clustEnr$table
+          GSEres$enrPlot <- clustEnr$plot
+        }
+        else {
+          GSEres$resTab <- NULL
+          showModal(modalDialog(
+            title = "No enrichment found...",
+            "Try again with a higher p-value cut-off.",
+            easyClose = TRUE,
+            footer = NULL
+          ))}
       }
       else {
         output$errMsg <- renderText("Please perform time series clustering first!")
@@ -1906,7 +1916,7 @@ shinyServer(function(input, output, session) {
     }
     else if ((input$seleSourceEnrich == "Differential expression") & (input$analysisMethod == "Phospho-signature enrichment")){
       # Phospho-signature enrichment for differential expression 
-      if ((!is.null(filterDE())) & (input$assay == "Phosphoproteome")) {
+      if (!is.null(filterDE())) {
         output$errMsg <- renderText("")
         withProgress(message = "Running enrichment analysis, please wait...", {
           # preprocess the input dataframe
@@ -1971,7 +1981,7 @@ shinyServer(function(input, output, session) {
     } 
     else if ((input$seleSourceEnrich == "Selected time-series cluster") & (input$analysisMethod == "Phospho-signature enrichment")) {
       # Phospho-signature enrichment for Time-series clustering 
-      if ((!is.null(selectedCluster())) & (input$assay == "Phosphoproteome")) {
+      if (nrow(selectedCluster()) > 0) {
         output$errMsg <- renderText("")
         withProgress(message = "Running enrichment analysis, please wait...", {
           # set color list to empty
@@ -2015,7 +2025,7 @@ shinyServer(function(input, output, session) {
       } else output$errMsg <- renderText("Please perform time series clustering first and make sure you have selected the Phopshoproteome assay!")
     }
     else if ((input$seleSourceEnrich =="All time-series clusters") & (input$analysisMethod == "Phospho-signature enrichment")) {
-      if (!is.null(clusterTabVal())) {
+      if (nrow(clusterTabVal()) > 0) {
         output$errMsg <- renderText("")
         # withProgress("Running enrichment analysis, please wait..", {
         #   
@@ -2033,8 +2043,18 @@ shinyServer(function(input, output, session) {
         clustEnr <- clusterEnrich(clusterTab = clusterTabVal(), 
                                   se = processedData(), inputSet = database,
                                   ptm = ptm)
-        GSEres$resTab <- clustEnr$table
-        GSEres$enrPlot <- clustEnr$plot
+        if (nrow(clustEnr$table) > 0) {
+          GSEres$resTab <- clustEnr$table
+          GSEres$enrPlot <- clustEnr$plot
+        }
+        else {
+          GSEres$resTab <- NULL
+          showModal(modalDialog(
+            title = "No enrichment found...",
+            "Try again with a higher p-value cut-off.",
+            easyClose = TRUE,
+            footer = NULL
+          ))}
       }
       else {
         output$errMsg <- renderText("Please perform time series clustering first!")
