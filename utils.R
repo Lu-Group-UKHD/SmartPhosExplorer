@@ -836,7 +836,7 @@ runFisher <- function (genes, reference, inputSet, ptm = FALSE) {
 }
 
 #perform enrichment for each cluster
-clusterEnrich <- function(clusterTab, se, inputSet, reference = NULL, ptm = FALSE, adj = "BH", fdrCut =0.1) {
+clusterEnrich <- function(clusterTab, se, inputSet, reference = NULL, ptm = FALSE, adj = "BH", filterP = 0.05, ifFDR = FALSE) {
   if (is.null(reference)) {
     if (ptm) {
       reference <- rowData(se)$site
@@ -857,15 +857,24 @@ clusterEnrich <- function(clusterTab, se, inputSet, reference = NULL, ptm = FALS
       mutate(cluster = cc)
   }) %>% bind_rows()
   
-  plotTab <- resTabFisher %>%
-    mutate(ifSig = padj <= fdrCut) %>%
-    group_by(Name) %>% mutate(atLeast1 = sum(ifSig)>0) %>%
-    filter(atLeast1) %>% ungroup()
+  if (ifFDR) {
+    plotTab <- resTabFisher %>%
+      filter(padj <= filterP) %>% arrange(padj) %>%
+      mutate(ifSig = padj <= filterP) %>%
+      group_by(Name) %>% mutate(atLeast1 = sum(ifSig)>0) %>%
+      filter(atLeast1) %>% ungroup()
+  }
+  else {
+    plotTab <- resTabFisher %>%
+      filter(pval <= filterP) %>% arrange(pval) %>%
+      mutate(ifSig = pval <= filterP) %>%
+      group_by(Name) %>% mutate(atLeast1 = sum(ifSig)>0) %>%
+      filter(atLeast1) %>% ungroup()
+  }
   
   p<- ggplot(plotTab, aes(x=cluster, y=Name, customdata = cluster, key = Name)) +
-    geom_point(aes(size =-log10(pval),fill=-log10(pval), color = ifSig), shape = 21) +
+    geom_point(aes(size =-log10(pval),fill=-log10(pval)), shape = 21, color = "black") +
     scale_fill_gradient(low = "white", high = "red") +
-    scale_color_manual(values = list(`TRUE` = "black", `FALSE` = "white")) +
     xlab("Cluster") +
     ylab("Pathway") +
     theme(axis.text.x = element_text(size = 12),

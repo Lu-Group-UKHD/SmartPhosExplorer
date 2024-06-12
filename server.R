@@ -1896,7 +1896,8 @@ shinyServer(function(input, output, session) {
         ptm <- FALSE
         clustEnr <- clusterEnrich(clusterTab = clusterTabVal(), 
                                   se = processedData(), inputSet = database,
-                                  ptm = ptm)
+                                  ptm = ptm, filterP = input$sigLevel,
+                                  ifFDR = input$ifEnrichFDR)
         if (nrow(clustEnr$table) > 0) {
           GSEres$resTab <- clustEnr$table
           GSEres$enrPlot <- clustEnr$plot
@@ -2042,7 +2043,8 @@ shinyServer(function(input, output, session) {
         ptm <- TRUE
         clustEnr <- clusterEnrich(clusterTab = clusterTabVal(), 
                                   se = processedData(), inputSet = database,
-                                  ptm = ptm)
+                                  ptm = ptm, filterP = input$sigLevel,
+                                  ifFDR = input$ifEnrichFDR)
         if (nrow(clustEnr$table) > 0) {
           GSEres$resTab <- clustEnr$table
           GSEres$enrPlot <- clustEnr$plot
