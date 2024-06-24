@@ -2393,7 +2393,7 @@ shinyServer(function(input, output, session) {
   # render the cluster enrichment profile plot as interactively plotly plot
   output$clustEnrPlot <- renderPlotly({
     if(!is.null(GSEres$resTab)) {
-      p <- ggplotly(GSEres$enrPlot, source = "enrich") 
+      p <- ggplotly(GSEres$enrPlot, source = "enrich", height = 60*length(unique(GSEres$resTab$Name))) 
       p %>% event_register("plotly_click")
       #ggplotly(GSEres$enrPlot)
       p

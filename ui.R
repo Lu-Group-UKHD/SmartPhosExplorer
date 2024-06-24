@@ -362,7 +362,7 @@ navbarPage("SmartPhos explorer",
                                                         uiOutput("downloadUI2"),width = 9),
                                                  column(plotOutput("plotEnr",height = 500, width = 600), width =6)),
                                 conditionalPanel(condition = " input.seleSourceEnrich == 'All time-series clusters'",
-                                                 plotlyOutput("clustEnrPlot"),
+                                                 plotlyOutput("clustEnrPlot", height = "auto"),
                                                  DT::dataTableOutput("geneTabClicked"),
                                                  plotOutput("plotGeneEnr"))
                       ))),
