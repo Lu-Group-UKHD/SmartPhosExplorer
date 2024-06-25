@@ -714,17 +714,25 @@ shinyServer(function(input, output, session) {
                 processedData()$sample, multiple = TRUE)
   })
   
+  output$seleMetaColBox <- renderUI({
+      useCol <- colnames(colData(processedData()))
+      useCol <- useCol[!useCol %in% c("sample","sampleType","adjustFactorPP")]
+      selectInput("seleMetaCol", "Select metadata column for testing",
+                  useCol, multiple = FALSE)
+  })
+  
+  
   # the selection box to select treatment for the reference group
   output$treat1Box <- renderUI({
-    allTreat <- unique(processedData()$treatment)
-    selectInput("seleTreat1", "Select treatment(s) for the reference group", allTreat, multiple = TRUE)
+    allTreat <- unique(processedData()[[input$seleMetaCol]])
+    selectInput("seleTreat1", "Select level(s) for the reference group", allTreat, multiple = TRUE)
   })
   
   # select time point for reference
   output$time1Box <- renderUI({
     if (!is.null(processedData()$timepoint)) {
       if (!is.null(input$seleTreat1))
-        allTime <- unique(processedData()[,processedData()$treatment %in% input$seleTreat1]$timepoint) else
+        allTime <- unique(processedData()[,processedData()[[input$seleMetaCol]] %in% input$seleTreat1]$timepoint) else
           allTime <- unique(processedData()$timepoint)
         selectInput("seleTime1", "Select time point(s) for the reference group", allTime, multiple = TRUE)
     }
@@ -732,15 +740,15 @@ shinyServer(function(input, output, session) {
   
   # the selection box to select treatment for the target groups
   output$treat2Box <- renderUI({
-    allTreat <- unique(processedData()$treatment)
-    selectInput("seleTreat2", "Select treatment(s) for the target group", allTreat, multiple = TRUE)
+    allTreat <- unique(processedData()[[input$seleMetaCol]])
+    selectInput("seleTreat2", "Select levels(s) for the target group", allTreat, multiple = TRUE)
   })
   
   # the select the comparison time point
   output$time2Box <- renderUI({
     if (!is.null(processedData()$timepoint)) {
       if (!is.null(input$seleTreat2))
-        allTime <- unique(processedData()[,processedData()$treatment %in% input$seleTreat2]$timepoint) else
+        allTime <- unique(processedData()[,processedData()[[input$seleMetaCol]] %in% input$seleTreat2]$timepoint) else
           allTime <- unique(processedData()$timepoint)
         selectInput("seleTime2", "Select time point(s) for the target group", allTime, multiple = TRUE)
     }
@@ -757,11 +765,11 @@ shinyServer(function(input, output, session) {
       if (!is.null(processedData()$timepoint)) {
         inputsValue$Treat1 <- input$seleTreat1
         inputsValue$Time1 <- input$seleTime1
-        selectedID <- processedData()[,processedData()$treatment %in% input$seleTreat1 & processedData()$timepoint %in% input$seleTime1]$sample
+        selectedID <- processedData()[,processedData()[[input$seleMetaCol]] %in% input$seleTreat1 & processedData()$timepoint %in% input$seleTime1]$sample
       }
       else {
         inputsValue$Treat1 <- input$seleTreat1
-        selectedID <-processedData()[,processedData()$treatment %in% input$seleTreat1]$sample
+        selectedID <-processedData()[,processedData()[[input$seleMetaCol]] %in% input$seleTreat1]$sample
       }
       selectedID
     }
@@ -778,11 +786,11 @@ shinyServer(function(input, output, session) {
       if (!is.null(processedData()$timepoint)) {
         inputsValue$Treat2 <- input$seleTreat2
         inputsValue$Time2 <- input$seleTime2
-        selectedID <- processedData()[,processedData()$treatment %in% input$seleTreat2 & processedData()$timepoint %in% input$seleTime2]$sample
+        selectedID <- processedData()[,processedData()[[input$seleMetaCol]] %in% input$seleTreat2 & processedData()$timepoint %in% input$seleTime2]$sample
       }
       else {
         inputsValue$Treat2 <- input$seleTreat2
-        selectedID <- processedData()[,processedData()$treatment %in% input$seleTreat2]$sample
+        selectedID <- processedData()[,processedData()[[input$seleMetaCol]] %in% input$seleTreat2]$sample
       }
       selectedID
     }
