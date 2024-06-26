@@ -41,13 +41,6 @@ performCombinedNormalization <- function(maeData) {
   return(comFP.norm)
 }
 
-removePrefix <- function(name, prefix) {
-  name <- gsub(prefix, "", name)
-  name <- gsub("^[._ ]","", name) #remove trailing characters after remove "FullProteome","Phospho" suffix or prefix
-  name <- gsub("[._ ]$","", name)
-  return(name)
-}
-
 getRatioMatrix <- function(maeData, normalization = FALSE, getAdjustedPP = FALSE) {
   # Get the ratios of phospho-proteins (or peptides) intensity in PP samples 
   # devided by FP samples 
@@ -70,9 +63,9 @@ getRatioMatrix <- function(maeData, normalization = FALSE, getAdjustedPP = FALSE
     phosFP <- performCombinedNormalization(maeData)
   }
   
-  # remove sample type prefix or suffix
-  colnames(phosFP) <- removePrefix(colnames(phosFP),"FullProteome")
-  colnames(phosPP) <- removePrefix(colnames(phosPP),"Phospho")
+  # use the sample name without prefix as column name
+  colnames(phosFP) <- maeData[,maeData$sampleType == "Phospho"]$sampleName
+  colnames(phosPP) <- maeData[,maeData$sampleType == "FullProteome"]$sampleName
   
   # get ratio matrix
   allSmp <- intersect(colnames(phosFP), colnames(phosPP))
@@ -91,7 +84,7 @@ plotLogRatio <- function(maeData, normalization = FALSE) {
   
   phosPP <- log2(assay(maeData[,maeData$sampleType == "Phospho"][["Phosphoproteome"]]))
   medianPP <- colMedians(phosPP,na.rm = TRUE)
-  names(medianPP) <- removePrefix(colnames(phosPP), "Phospho")
+  names(medianPP) <- maeData[,maeData$sampleType == "Phospho"]$sampleName
   
   plotTab <- as_tibble(ratioMat, rownames = "feature") %>%
     pivot_longer(-feature) %>%
@@ -173,9 +166,8 @@ runPhosphoAdjustment <- function(maeData, normalization = FALSE, minOverlap = 3,
   # add adjusting factor to sample annotation  
   adjFac[names(optRes$par)] <- optRes$par
   ppName <- colnames(maeData[,maeData$sampleType == "Phospho"][["Phosphoproteome"]])
-  adjFac <- structure(adjFac[removePrefix(ppName,"Phospho")], names = ppName)
+  adjFac <- structure(adjFac[maeData[,ppName]$sampleName], names = ppName)
   maeData$adjustFactorPP <- unname(adjFac[match(rownames(colData(maeData)),names(adjFac))])
-  
   # adjust phospho measurement on PP samples
   phosMat <- assay(maeData[,maeData$sampleType == "Phospho"][["Phosphoproteome"]])
   phosMat <- t(t(phosMat)*(2^adjFac))

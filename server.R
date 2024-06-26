@@ -12,6 +12,9 @@ shinyServer(function(input, output, session) {
   # a reactive val to store the multiassayexperiment object
   mae <- reactiveVal()
   
+  # a reactive val to store the mae after normalization adjustment, this is used for updating PP/FP ratio plot
+  maeAdj <- reactiveVal()
+  
   # a reactive variable to stored the processed and unfiltered assay
   processedDataUF <- reactiveVal()
   
@@ -47,6 +50,7 @@ shinyServer(function(input, output, session) {
   # load saved file
   observeEvent(input$load, {
     mae(readRDS(paste0("save/", input$seleFile)))
+    maeAdj(NULL)
   })
   
   # download the multiAssayExperiment object
@@ -116,6 +120,7 @@ shinyServer(function(input, output, session) {
           testData <- SmartPhos::readExperiment(fileTable, annotation_col = input$colAnnoPreprocess)
         }
         mae(testData)
+        maeAdj(NULL) #reset maeAdj
       },
       error = function(e) {
         showModal(modalDialog(
@@ -136,6 +141,7 @@ shinyServer(function(input, output, session) {
     # making sure an rds object is being uploaded
     validate(need(ext %in% c("rds", "RDS", "Rds"), "Please upload an rds object"))
     mae(readRDS(file$datapath))
+    maeAdj(NULL) #reset maeAdj
   })
 
   # rendering select options in the UI based on the uploaded object
@@ -214,6 +220,16 @@ shinyServer(function(input, output, session) {
   #-----------------------------------------------------------------------------------------------------------
   
   # rendering options for the phospho-enriched or non-enriched sample type 
+  
+  #wether to normalize phosphodata with proteomic data
+  output$ifNormByProteinBox <- renderUI({
+      if (!is.null(mae())) {
+          if (input$assay == "Phosphoproteome" & "Proteome" %in% names(assays(mae()))) {
+              checkboxInput("ifNormByProtein","Normalize phosphorylation by protein expression", value = FALSE)
+          }
+      }
+  })
+  
   output$seleNormCorrect <- renderUI({
     if (!is.null(mae())) {
       if (input$assay == "Phosphoproteome" & input$getFP == FALSE) {
@@ -242,8 +258,11 @@ shinyServer(function(input, output, session) {
   observeEvent(input$processSelection, {
     withProgress(message = 'Processing files', {
       # normalization correction if selected
-      # first step, whether to perform phospho normalization correction, if phospho data is selected.    
+      # first step, whether to perform phospho normalization correction, if phospho data is selected.
+      maeData <- mae()
+      
       if (input$assay == "Phosphoproteome") {
+          
         if (input$ifNormCorrect) {
           inputsValue$ifNormCorrect <- input$ifNormCorrect
           maeData <- runPhosphoAdjustment(mae(), 
@@ -253,19 +272,17 @@ shinyServer(function(input, output, session) {
                                           )
           assays(maeData[["Phosphoproteome"]])[["Intensity"]] <- assays(maeData[["Phosphoproteome"]])[["Intensity_adjusted"]]
           assays(maeData[["Phosphoproteome"]])[["Intensity_adjusted"]] <- NULL
-          # if (is.na(maeData$adjustFactorPP)) {
-          #   showModal(modalDialog(
-          #     title = "One sample removed because of low quality...",
-          #     easyClose = TRUE,
-          #     footer = NULL
-          #   ))
-          # }
-          maeData <- maeData[, !is.na(maeData$adjustFactorPP)]
+          #maeData <- maeData[, !is.na(maeData$adjustFactorPP)]
+          maeAdj(maeData)
+        } 
+         
+        #wehther normalize the phospho intensity by protein expression, 
+          #if normalization adjustment is performed, this will be performed after normalization adjustment
+        if (input$ifNormByProtein) {
+            inputsValue$ifNormByProtein <- input$ifNormByProtein
+            maeData <- SmartPhos::normByFullProteome(maeData)
         }
-        else maeData <- mae()
       }
-        
-      else maeData <- mae()
       # summarizedAssayExperiment object of the selected assay
       se <- maeData[[input$assay]]
       colData(se) <- colData(maeData[, colnames(se)])
@@ -299,6 +316,8 @@ shinyServer(function(input, output, session) {
                              scaleFactorTab = NULL)
         processedDataUF(pp)
       }
+      
+      #log 
       inputsValue$transform <- input$transform
       inputsValue$normalize <- input$normalize
       inputsValue$missFilter <- input$missFilter
@@ -385,7 +404,11 @@ shinyServer(function(input, output, session) {
   
   # plot log ratio
   output$boxPlotLogRatio <- renderPlot({
-    plotLogRatio(mae(), normalization = FALSE)
+    if (is.null(maeAdj())) {
+        plotLogRatio(mae(), normalization = FALSE)
+    } else {
+        plotLogRatio(maeAdj(), normalization = FALSE)
+    }
   })
   
   # Plot boxplot
@@ -431,7 +454,7 @@ shinyServer(function(input, output, session) {
     if ("imputed" %in% assayNames(processedData())) {
       output$errMsgPCA <- renderText("")
       withProgress(message = "Running principal component analysis, please wait...", {
-        pca <- stats::prcomp(t(assays(processedData())[["imputed"]]))
+        pca <- stats::prcomp(t(assays(processedData())[["imputed"]]), center = TRUE, scale.=TRUE)
         # variance explained
         varExplained <- pca$sdev^2/sum(pca$sdev^2)
         pcaDf <- as.data.frame(pca[["x"]])
@@ -716,7 +739,7 @@ shinyServer(function(input, output, session) {
   
   output$seleMetaColBox <- renderUI({
       useCol <- colnames(colData(processedData()))
-      useCol <- useCol[!useCol %in% c("sample","sampleType","adjustFactorPP")]
+      useCol <- useCol[!useCol %in% c("sample","sampleType","adjustFactorPP","sampleName")]
       selectInput("seleMetaCol", "Select metadata column for testing",
                   useCol, multiple = FALSE)
   })
