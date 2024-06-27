@@ -347,11 +347,14 @@ preprocessProteome <- function(seData, filterList = NULL, missCut = 50,
     else if (impute == "bpca") {
       imp <- DEP::impute(fpeSub, "bpca")
     }
-    else {
+    else if (impute == "missForest") {
       doParallel::registerDoParallel(cores = 6)  # set based on number of CPU cores
       doRNG::registerDoRNG(seed = 123)
       mf <- missForest::missForest(t(assay(fpeSub)), parallelize = "forests", maxiter = 2, ntree = 50)
       imp <- t(mf$ximp)
+    }
+    else if (impute == "MinDet") {
+        imp <- DEP::impute(fpeSub, "MinDet")  
     }
     assays(fpeSub)[["imputed"]] <- assay(imp)
     rowData(fpeSub)$name <- NULL
@@ -493,6 +496,9 @@ preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
     }
     else if (impute == "bpca") {
       imp <- DEP::impute(ppeSub, "bpca")
+    }
+    else if (impute == "MinDet") {
+        imp <- DEP::impute(ppeSub, "MinDet")  
     }
     else {
       doParallel::registerDoParallel(cores = 6)  # set based on number of CPU cores
