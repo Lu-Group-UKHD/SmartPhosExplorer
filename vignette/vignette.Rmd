@@ -1,7 +1,7 @@
 ---
 title: "SmartPhos Explorer: a ShinyApp pipeline for processing and analysing phosphoproteomics data"
 author: "Shubham Agrawal, Cong Quan Ta"
-date: "2024-03-27"
+date: "2024-07-01"
 output:
   BiocStyle::html_document:
     toc_float: true
@@ -45,7 +45,7 @@ This tab contains the preprocessing options before diving into the data for expl
 
 Uploading is one of the most important steps in the smooth functioning of the app.
 
-```{r, out.width = "350px"}
+```{r, out.width = "400px"}
 knitr::include_graphics("images/2.png")
 ```
 
@@ -107,16 +107,20 @@ knitr::include_graphics("images/error2.png")
 knitr::include_graphics("images/error3.png")
 ```
 
+User have options to also download the created multiAssayExperiment object for using in other analysis. There are options of saving the object in the local version of shiny app and also to load and delete the object already stored in the local version of the shiny app. 
+
 ## Preprocessing options
 
 SmartPhos package performs some pre-filtering and preprocessing based on various threshold values during the generation of the multiAssayExperiment object. On top of that, this panel has different options for preprocessing of the selected assay. The options provided by the shiny app are as follows:
 
 * **Normalization correction**: This option is present only if the phophoproteomics data is present. It allows for the correction of normalization artefacts introduced by the Spectronaut. 
+* **Normalize** phospho intensity by the corresponding protein expression.
 * **Transformation**: The transformation methods available are: log2 and vst (variance stabilizing transformation).
 * **Normalization**: Normalization strategy depends on the selected transformation method. Therefore, the user has option of *Yes* or *No*. If the user selects *Yes*, then for log2 and no transformation, *median scaling* is applied and for vst, *vsn* is applied. 
 * **Missing values**: Users can select what percentage of missing values are allowed. Proteins with missing values above the selected threshold will be removed from all analyses.
 * **Imputation**: Currently four imputation methods are available: 
   + QRILC (Quantile Regression Imputation of Left-Censored data)
+  + MinDet (Deterministic minimal value approach)
   + BPCA (Bayesian PCA)
   + MLE (Maximum Likelihood Estimation)
   + Random forest
@@ -124,7 +128,7 @@ SmartPhos package performs some pre-filtering and preprocessing based on various
   
 After selecting the options, press the **Process** button to perform the preprocessing. 
   
-```{r, out.width="350px"}
+```{r, out.width="400px"}
 knitr::include_graphics("images/preprocess.png")
 ```
 
@@ -138,11 +142,8 @@ The preprocessing tab has some more options:
 * Samples which are outliers can be removed. Simply writing the names of the samples (delimited by comma) in the text box will remove those samples. It also supports regex option. For example: if "100min" is typed in the outlier box, then all the samples with 100min timepoint will be removed. 
 * Coloring the box plot based on different annotations is also possible. 
 * Subsetting of the dataset is possible from the displayed table. The selected annotations in the filter options of different columns will be used for subsetting the data. The following tabs of the shinyApp will use that subsetted data for further exploration and analysis. Subsetting can be undone by simply removing the annotations from filter boxes. 
-* If the user has already clicked on process button in the prepocessing options panel, the processed assay will also be saved as a summarized experiment object along with the original multiAssayExperiment object when clicking on the save button. Same with the filtered or subsetted assay. The multiAssayExperiment object will have _mae_ keyword in the saved Rds object. 
+* User can download the selected assay after preprocessing in a summarizedExperiment object as a rds file. 
 
-```{r, out.width="320px"}
-knitr::include_graphics("images/otherOptions1.png")
-```
 ```{r, out.width="400px"}
 knitr::include_graphics("images/otherOptions2.png")
 ```
@@ -235,14 +236,14 @@ The two methods available for performing differential expression analysis are:
 * **limma**: uses linear models.
 * **ProDA**: uses probabilistic dropout model.
 
-To use this tab, users need to select samples for the reference and target group, between which the differential expression analysis will be performed. This can be done by either selecting treatments or selecting sample IDs. In the former, time points should also be specified if the column **timepoint** is present in the *fileTable.txt* file. Multiple treatments and time points can be selected for each group. As the selection is updated for each group, the user interface informs users of the number of samples in each group as well as a warning if a sample is present in both group. The latter option allows users to directly choose which sample to include in each group, thereby allowing more flexibility in sample selection. The two figures below show examples of the user interface when using either option. Notice that a warning was given in the latter since one sample was present in both groups.
+To use this tab, first the user has to select the metadata column for which they want to perform the analysis. Users need to select samples for the reference and target group, between which the differential expression analysis will be performed. This can be done by either selecting treatments or selecting sample IDs. In the former, time points should also be specified if the column **timepoint** is present in the *fileTable.txt* file. Multiple treatments and time points can be selected for each group. As the selection is updated for each group, the user interface informs users of the number of samples in each group as well as a warning if a sample is present in both group. The latter option allows users to directly choose which sample to include in each group, thereby allowing more flexibility in sample selection. The two figures below show examples of the user interface when using either option. Notice that a warning was given in the latter since one sample was present in both groups.
 
-```{r, out.width="300px"}
-knitr::include_graphics("images/Q_DE_option1.PNG")
+```{r, out.width="350px"}
+knitr::include_graphics("images/DE_option1.png")
 ```
 
-```{r, out.width="300px"}
-knitr::include_graphics("images/Q_DE_option2.PNG")
+```{r, out.width="350px"}
+knitr::include_graphics("images/DE_option2.png")
 ```
 
 The output of differential expression analysis is a table which contains the differentially expressed genes arranged by the lowest p-values. The other information present in the table are: Uniprot ID, log2 fold change, t-statistic, adjusted p-value and some information if the data is phosphoproteomic data. A volcano plot is also plotted, highlighing the points with positive and negative log fold-change and above certain p value. The histogram of p-value is also plotted. 
@@ -277,11 +278,11 @@ To use this tab, users must specify the **timepoint** column in the **fileTable.
 
 The options for using this tab are as follow:
 
-```{r, out.width="300px"}
+```{r, out.width="350px"}
 knitr::include_graphics("images/timeSeriesOptions.png")
 ```
 
-Users first need to choose a treatment of interest for the analysis. Additionally, if the clustering is performed on either "logFC" or "two-condition expression", a reference treatment should also be chosen. The options to perform clustering on determine what it means for genes to be in the same cluster:  
+Users first need to choose the metadata column of interest for the analysis. Based on the selected metadata, user will be provided with the different conditions to choose from. Additionally, if the clustering is performed on either "logFC" or "two-condition expression", a reference condition should also be chosen. The options to perform clustering on determine what it means for genes to be in the same cluster:  
 
 * **expression**: Genes in the same cluster have the similar trend in their **expression level**.
 * **logFC**: Genes in the same cluster have the similar trend in their fold-change, (**logFC**). The fold-change is the difference in expression level between the two selected treatments.
@@ -336,20 +337,26 @@ knitr::include_graphics("images/timeSeriesErr1.png")
 
 # Enrichment analysis
 
-This tab performs enrichment analysis on genes or phosphosites that are differentially expressed or in a time series cluster. To use this tab, users would first need to perform either a differential expression analysis or time-series clustering. In the latter, users would also need to select a cluster of interest in the time-series clustering tab. We offer the possibilities to perform enrichment analysis on either gene sets (gene-centric) or post-translational modification signature sets (site-centric). In the latter, each set contains PTM site names with direction of regulation (up- or down-regulated) instead of gene names. Only phosphorylation sites will be considered since this pipeline supports proteomic and phosphoproteomic data. The gene sets and PTM signature sets are derived from the Molecular Signatures Database (Subramanian, Tamayo et al.,2005; Liberzon et al., 2011, Liberzon et al., 2015) and the PTM Signature Database version 2.0.0 (Krug et al., 2019), respectively. Users are encouraged to consult the PTMsigDB website (https://proteomics.broadapps.org/ptmsigdb/) and the paper of Krug et al. for details on how PTM signature sets were curated and their annotation.
+This tab performs enrichment analysis on genes or phosphosites that are differentially expressed or in a time series cluster. To use this tab, users would first need to perform either a differential expression analysis or time-series clustering. Users have three options to choose the source of gene list:
+
+* Differential expression: the gene list of the differential analysis result.
+* Select time-series cluster: the selected cluster after performing the time-series clustering.
+* All time-series cluster: on all the clusters resulted after performing the time-series clustering.
+
+We offer the possibilities to perform enrichment analysis on either gene sets (gene-centric) or post-translational modification signature sets (site-centric). In the latter, each set contains PTM site names with direction of regulation (up- or down-regulated) instead of gene names. Only phosphorylation sites will be considered since this pipeline supports proteomic and phosphoproteomic data. The gene sets and PTM signature sets are derived from the Molecular Signatures Database (Subramanian, Tamayo et al.,2005; Liberzon et al., 2011, Liberzon et al., 2015) and the PTM Signature Database version 2.0.0 (Krug et al., 2019), respectively. Users are encouraged to consult the PTMsigDB website (https://proteomics.broadapps.org/ptmsigdb/) and the paper of Krug et al. for details on how PTM signature sets were curated and their annotation.
 
 In gene-centric pathway enrichment, users can perform either Parametric Analysis of Gene Set Enrichment (PAGE) (Kim & Volsky, 2005) or Gene Set Enrichment Analysis (GSEA) (Subramanian, Tamayo et al.,2005) with Differential Expression analysis result. With Time series clustering result, we offer the Fisher's exact test. For phospho-signature enrichment on Differential Expression analysis result, we offer PTM-Signature Enrichment Analysis (PTM-SEA), a method adapted from GSEA by Krug et al. (2019) to be applicable with the PTM Signature Database. On time series clustering result, we offer the Fisher's exact test, in which each signature set is split into two, one containing upregulated and the other downregulated phosphosites.
 
 Options for performing enrichment analysis are shown below:
-```{r, out.width="300px"}
-knitr::include_graphics("images/Q_enrich_option1.PNG")
+```{r, out.width="350px"}
+knitr::include_graphics("images/enrich_option.png")
 ```
 
 * **Select analysis method**: Whether to perform gene-centric pathway enrichment or site-centric phospho-signature enrichment. If the Proteome assay is selected in the preprocessing tab, only the former is available.
-* **Source of gene list**: Whether to use result from differential expression analysis or time-series cluster
+* **Source of gene list**: Whether to use result from differential expression analysis, selected time-series cluster or all time-series cluster
 * **Select enrichment method**: Which method should be used for the analysis. In pathway enrichment, the method is either "PAGE" (Parametric Analysis of Gene Set Enrichment) or "GSEA" (Gene Set Enrichment Analysis) for differential expression result and only Fisher's exact test for time-series clustering. If "GSEA" is chosen, the number of permutations to generate the null distribution should also be specified (default 100). In phospho-signature enrichment, the method is PTM-SEA (not shown on UI) for differential expression and Fisher's exact test for time series clustering.
 * **Statistic used for ranking**: Whether to use t-statistics or log2FC for the analysis, only applies to differential expression result.
-* **Select geneset database**: Which gene set or PTM signature set database should be used for the analysis. The analysis method chosen above affects the options available here.
+* **Select geneset database**: User here has option either to select from available gene set/ PTM set database listed in the box or upload another gene set/ PTM set.
 * P-value cut-off and option to use FDR.
 
 ## Output
@@ -416,6 +423,13 @@ The tables above can be downloaded as tsv files. Clicking on a gene/phosphosite 
 ```{r}
 knitr::include_graphics("images/Q_enrich_result4.PNG")
 knitr::include_graphics("images/Q_enrich_result5.PNG")
+```
+
+If the user has selected All time-series cluster, then a dot plot is generated. The dot plot displays all the enriched pathways for each cluster. Clicking on the points inside the dot plot will give the list of genes or phosphosites associated with the particular pathway and the cluster. Clicking on the row of the list will plot a expression level trend for the selected  genes or phosphosites. 
+
+```{r}
+knitr::include_graphics("images/enrich_result6.png")
+knitr::include_graphics("images/enrich_result7.png")
 ```
 
 # Kinase activity inference

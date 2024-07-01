@@ -1,5 +1,33 @@
 # SmartPhosExplorer update notes
 
+## Version: 1.0.5
+
+Date: 2024-07-01
+
+CHANGES IN VERSION 1.0.5
+
+------------------------------------------------
+
+Preprocessing:
+
+* Add an option to normalize phospho intensity by the corresponding protein expression.
+* Add MinDet imputation method.
+
+Differential expression analysis: 
+
+* Add option to allow users to choose which metadata column should be used for hypothesis testing. 
+
+Time series clustering:    
+
+* Add option to allow users to choose which metadata column should be used for clustering. 
+
+Enrichment analysis:
+
+* Add another option to perform enrichment analysis on all the time-series clusters and generate an interactive dot plot. Clicking on the points will give a list of genes associated with that pathway and the cluster. 
+* User can upload a Gene Set file (.gmt) and a PTM set file (.txt file) instead of selecting from the available selections.
+
+-------------------------------------------------------
+
 ## Version: 1.0.4
 
 Date: 2024-03-27
