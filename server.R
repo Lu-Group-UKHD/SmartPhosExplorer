@@ -737,17 +737,17 @@ shinyServer(function(input, output, session) {
                 processedData()$sample, multiple = TRUE)
   })
   
-  output$seleMetaColBox <- renderUI({
+  output$seleMetaColBoxDiff <- renderUI({
       useCol <- colnames(colData(processedData()))
       useCol <- useCol[!useCol %in% c("sample","sampleType","adjustFactorPP","sampleName")]
-      selectInput("seleMetaCol", "Select metadata column for testing",
+      selectInput("seleMetaColDiff", "Select metadata column for testing",
                   useCol, multiple = FALSE)
   })
   
   
   # the selection box to select treatment for the reference group
   output$treat1Box <- renderUI({
-    allTreat <- unique(processedData()[[input$seleMetaCol]])
+    allTreat <- unique(processedData()[[input$seleMetaColDiff]])
     selectInput("seleTreat1", "Select level(s) for the reference group", allTreat, multiple = TRUE)
   })
   
@@ -755,7 +755,7 @@ shinyServer(function(input, output, session) {
   output$time1Box <- renderUI({
     if (!is.null(processedData()$timepoint)) {
       if (!is.null(input$seleTreat1))
-        allTime <- unique(processedData()[,processedData()[[input$seleMetaCol]] %in% input$seleTreat1]$timepoint) else
+        allTime <- unique(processedData()[,processedData()[[input$seleMetaColDiff]] %in% input$seleTreat1]$timepoint) else
           allTime <- unique(processedData()$timepoint)
         selectInput("seleTime1", "Select time point(s) for the reference group", allTime, multiple = TRUE)
     }
@@ -763,7 +763,7 @@ shinyServer(function(input, output, session) {
   
   # the selection box to select treatment for the target groups
   output$treat2Box <- renderUI({
-    allTreat <- unique(processedData()[[input$seleMetaCol]])
+    allTreat <- unique(processedData()[[input$seleMetaColDiff]])
     selectInput("seleTreat2", "Select levels(s) for the target group", allTreat, multiple = TRUE)
   })
   
@@ -771,7 +771,7 @@ shinyServer(function(input, output, session) {
   output$time2Box <- renderUI({
     if (!is.null(processedData()$timepoint)) {
       if (!is.null(input$seleTreat2))
-        allTime <- unique(processedData()[,processedData()[[input$seleMetaCol]] %in% input$seleTreat2]$timepoint) else
+        allTime <- unique(processedData()[,processedData()[[input$seleMetaColDiff]] %in% input$seleTreat2]$timepoint) else
           allTime <- unique(processedData()$timepoint)
         selectInput("seleTime2", "Select time point(s) for the target group", allTime, multiple = TRUE)
     }
@@ -788,11 +788,11 @@ shinyServer(function(input, output, session) {
       if (!is.null(processedData()$timepoint)) {
         inputsValue$Treat1 <- input$seleTreat1
         inputsValue$Time1 <- input$seleTime1
-        selectedID <- processedData()[,processedData()[[input$seleMetaCol]] %in% input$seleTreat1 & processedData()$timepoint %in% input$seleTime1]$sample
+        selectedID <- processedData()[,processedData()[[input$seleMetaColDiff]] %in% input$seleTreat1 & processedData()$timepoint %in% input$seleTime1]$sample
       }
       else {
         inputsValue$Treat1 <- input$seleTreat1
-        selectedID <-processedData()[,processedData()[[input$seleMetaCol]] %in% input$seleTreat1]$sample
+        selectedID <-processedData()[,processedData()[[input$seleMetaColDiff]] %in% input$seleTreat1]$sample
       }
       selectedID
     }
@@ -809,11 +809,11 @@ shinyServer(function(input, output, session) {
       if (!is.null(processedData()$timepoint)) {
         inputsValue$Treat2 <- input$seleTreat2
         inputsValue$Time2 <- input$seleTime2
-        selectedID <- processedData()[,processedData()[[input$seleMetaCol]] %in% input$seleTreat2 & processedData()$timepoint %in% input$seleTime2]$sample
+        selectedID <- processedData()[,processedData()[[input$seleMetaColDiff]] %in% input$seleTreat2 & processedData()$timepoint %in% input$seleTime2]$sample
       }
       else {
         inputsValue$Treat2 <- input$seleTreat2
-        selectedID <- processedData()[,processedData()[[input$seleMetaCol]] %in% input$seleTreat2]$sample
+        selectedID <- processedData()[,processedData()[[input$seleMetaColDiff]] %in% input$seleTreat2]$sample
       }
       selectedID
     }
@@ -1114,17 +1114,24 @@ shinyServer(function(input, output, session) {
   #################################################### time series clustering ##################################################
   
   #### Widgets
-  # the selection box to select the treatment
-  output$clusterTreatBox <- renderUI({
-    allTreat <- unique(processedData()$treatment)
-    selectInput("seleTreat_cluster","Select a treatment", allTreat)
+  output$seleMetaColBoxTime <- renderUI({
+    useCol <- colnames(colData(processedData()))
+    useCol <- useCol[!useCol %in% c("sample","sampleType","adjustFactorPP", "timepoint")]
+    selectInput("seleMetaColTime", "Select metadata column for testing",
+                useCol, multiple = FALSE)
   })
   
-  # the selection box to select the reference treatment
+  # the selection box to select the condition
+  output$clusterTreatBox <- renderUI({
+    allTreat <- unique(processedData()[[input$seleMetaColTime]])
+    selectInput("seleTreat_cluster", "Select a condition", allTreat)
+  })
+  
+  # the selection box to select the reference condition
   output$clusterTreatRefBox <- renderUI({
-    allTreat <- unique(processedData()$treatment)
+    allTreat <- unique(processedData()[[input$seleMetaColTime]])
     allTreat <- allTreat[!allTreat %in% input$seleTreat_cluster]
-    selectInput("seleTreat_clusterRef","Select a reference treatment", allTreat)
+    selectInput("seleTreat_clusterRef","Select a reference condition", allTreat)
   })
   
   # link to download the cluster table
@@ -1161,8 +1168,8 @@ shinyServer(function(input, output, session) {
   
   # selecting time range
   output$timerangeBox <- renderUI({
-    # list the time points available to the selected treatment
-    processedDataSub <- processedData()[, processedData()$treatment == input$seleTreat_cluster]
+    # list the time points available to the selected condition
+    processedDataSub <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster]
     allTimepoint <- unique(processedDataSub$timepoint)
     # remove time points with only 1 sample
     remove1sampleT <- c()
@@ -1172,9 +1179,9 @@ shinyServer(function(input, output, session) {
         remove1sampleT <- append(remove1sampleT, time)
     }
     allTimepoint <- allTimepoint[!allTimepoint %in% remove1sampleT]
-    # if a reference treatment is selected, then only list timepoints shared between the two treatments
+    # if a reference treatment is selected, then only list timepoints shared between the two conditions
     if (input$clusterFor == "logFC" | input$clusterFor == "two-condition expression") {
-      processedDataRef <- processedData()[, processedData()$treatment == input$seleTreat_clusterRef]
+      processedDataRef <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef]
       timepointRef <- unique(processedDataRef$timepoint)
       # remove time points with only 1 sample
       remove1sampleT <- c()
@@ -1203,7 +1210,7 @@ shinyServer(function(input, output, session) {
   output$zeroTreat <- renderUI({
     if (input$addZero) {
       cd <- colData(processedData())
-      treatment <- unique(cd$treatment[cd$timepoint == "0min"])
+      treatment <- unique(cd[[input$seleMetaColTime]][cd$timepoint == "0min"])
       
       output$zeroTreatInfo <- renderUI({
         if (input$addZero) {
@@ -1230,7 +1237,7 @@ shinyServer(function(input, output, session) {
                                         input$seleZeroTreat, input$seleTimeRange)
       }
       else {
-        processedDataSub <- processedData()[, processedData()$treatment == input$seleTreat_cluster & 
+        processedDataSub <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster & 
                                               processedData()$timepoint %in% input$seleTimeRange]
       }
       assayMat <- assay(processedDataSub)
@@ -1269,10 +1276,9 @@ shinyServer(function(input, output, session) {
       if (!is.null(input$seleZeroTreat) & input$addZero) {
         inputsValue$addZero <- input$addZero
         inputsValue$seleZeroTreat <- input$seleZeroTreat
-        processedDataSub <- processedData()[, processedData()$treatment == input$seleTreat_cluster]
+        processedDataSub <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster]
         allTimepoint <- unique(processedDataSub$timepoint)
-        
-        processedDataRef <- processedData()[, processedData()$treatment == input$seleTreat_clusterRef]
+        processedDataRef <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef]
         timepointRef <- unique(processedDataRef$timepoint)
         # add zero timepoint samples if missing
         if (!("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
@@ -1284,20 +1290,20 @@ shinyServer(function(input, output, session) {
         else if (!("0min" %in% allTimepoint) & ("0min" %in% timepointRef)) {
           processedDataSub <- addZeroTime(processedData(), input$seleTreat_cluster,
                                           input$seleZeroTreat, input$seleTimeRange)
-          processedDataRef <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & 
+          processedDataRef <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef & 
                                                 processedData()$timepoint %in% input$seleTimeRange]
         }
         else if (("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
-          processedDataSub <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
+          processedDataSub <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster & 
                                                 processedData()$timepoint %in% input$seleTimeRange]
           processedDataRef <- addZeroTime(processedData(), input$seleTreat_clusterRef,
                                           input$seleZeroTreat, input$seleTimeRange)
         }
       }
       else {
-        processedDataSub <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
+        processedDataSub <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster & 
                                               processedData()$timepoint %in% input$seleTimeRange]
-        processedDataRef <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & 
+        processedDataRef <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef & 
                                               processedData()$timepoint %in% input$seleTimeRange]
       }
       assayMat <- assay(processedDataSub)
@@ -1367,10 +1373,9 @@ shinyServer(function(input, output, session) {
       if (!is.null(input$seleZeroTreat) & input$addZero) {
         inputsValue$addZero <- input$addZero
         inputsValue$seleZeroTreat <- input$seleZeroTreat
-        processedDataSub <- processedData()[, processedData()$treatment == input$seleTreat_cluster]
+        processedDataSub <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster]
         allTimepoint <- unique(processedDataSub$timepoint)
-        
-        processedDataRef <- processedData()[, processedData()$treatment == input$seleTreat_clusterRef]
+        processedDataRef <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef]
         timepointRef <- unique(processedDataRef$timepoint)
         # add zero timepoint samples if missing
         if (!("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
@@ -1387,7 +1392,7 @@ shinyServer(function(input, output, session) {
         else if (!("0min" %in% allTimepoint) & ("0min" %in% timepointRef)) {
           processedData1 <- addZeroTime(processedData(), input$seleTreat_cluster,
                                         input$seleZeroTreat, input$seleTimeRange)
-          processedData2 <- processedData()[, processedData()$treatment == input$seleTreat_clusterRef & 
+          processedData2 <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef & 
                                               processedData()$timepoint %in% input$seleTimeRange]
           assay <- cbind(assay(processedData1), assay(processedData2))
           cd <- rbind(colData(processedData1), colData(processedData2))
@@ -1396,7 +1401,7 @@ shinyServer(function(input, output, session) {
           processedDataSub <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
         }
         else if (("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
-          processedData1 <- processedData()[, processedData()$treatment == input$seleTreat_cluster & 
+          processedData1 <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster & 
                                               processedData()$timepoint %in% input$seleTimeRange]
           processedData2 <- addZeroTime(processedData(), input$seleTreat_clusterRef,
                                         input$seleZeroTreat, input$seleTimeRange)
@@ -1408,7 +1413,7 @@ shinyServer(function(input, output, session) {
         }
       }
       else {
-        processedDataSub <- processedData()[,processedData()$treatment %in% c(input$seleTreat_cluster, input$seleTreat_clusterRef) & 
+        processedDataSub <- processedData()[,processedData()[[input$seleMetaColTime]] %in% c(input$seleTreat_cluster, input$seleTreat_clusterRef) & 
                                               processedData()$timepoint %in% input$seleTimeRange]
       }
       assayMat <- assay(processedDataSub)
@@ -1419,7 +1424,7 @@ shinyServer(function(input, output, session) {
         if (!is.null(processedDataSub$subjectID)) {
           assayMat <- splineFilter(assayMat, subjectID = processedDataSub$subjectID,
                                    time = processedDataSub$timepoint,
-                                   treatment = processedDataSub$treatment,
+                                   treatment = processedDataSub[[input$seleMetaColTime]],
                                    refTreatment = input$seleTreat_clusterRef,
                                    df = length(unique(processedDataSub$timepoint))-1,
                                    pCut = as.numeric(input$pSpline),
@@ -1427,7 +1432,7 @@ shinyServer(function(input, output, session) {
         } else {
           assayMat <- splineFilter(assayMat, subjectID = NULL,
                                    time = processedDataSub$timepoint,
-                                   treatment = processedDataSub$treatment,
+                                   treatment = processedDataSub[[input$seleMetaColTime]],
                                    refTreatment = input$seleTreat_clusterRef,
                                    df = length(unique(processedDataSub$timepoint))-1,
                                    pCut = as.numeric(input$pSpline),
@@ -1435,7 +1440,7 @@ shinyServer(function(input, output, session) {
         }
         processedDataSub <- processedDataSub[rownames(assayMat),]
       }
-      processedDataSub$timeTreat <- paste0(processedDataSub$timepoint,"_", processedDataSub$treatment)
+      processedDataSub$timeTreat <- paste0(processedDataSub$timepoint,"_", processedDataSub[[input$seleMetaColTime]])
       exprMat <- lapply(unique(processedDataSub$timeTreat), function(tt) {
         rowMedians(assayMat[,processedDataSub$timeTreat == tt])
       }) %>% bind_cols() %>% as.matrix()
@@ -1589,17 +1594,17 @@ shinyServer(function(input, output, session) {
                                 input$seleZeroTreat, input$seleTimeRange)
         }
         else {
-          seqMat <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
+          seqMat <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster & 
                                       processedData()$timepoint %in% input$seleTimeRange]
         }
         yLabText <- "Normalized expression"
       } 
       else if (input$clusterFor == "logFC"){
         if (!is.null(input$seleZeroTreat) & input$addZero) {
-          processedDataSub <- processedData()[, processedData()$treatment == input$seleTreat_cluster]
+          processedDataSub <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster]
           allTimepoint <- unique(processedDataSub$timepoint)
           
-          processedDataRef <- processedData()[, processedData()$treatment == input$seleTreat_clusterRef]
+          processedDataRef <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef]
           timepointRef <- unique(processedDataRef$timepoint)
           # add zero timepoint samples if missing
           if (!("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
@@ -1611,20 +1616,20 @@ shinyServer(function(input, output, session) {
           else if (!("0min" %in% allTimepoint) & ("0min" %in% timepointRef)) {
             seqMat <- addZeroTime(processedData(), input$seleTreat_cluster,
                                   input$seleZeroTreat, input$seleTimeRange)
-            RefMat <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & 
+            RefMat <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef & 
                                         processedData()$timepoint %in% input$seleTimeRange]
           }
           else if (("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
-            seqMat <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
+            seqMat <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster & 
                                         processedData()$timepoint %in% input$seleTimeRange]
             RefMat <- addZeroTime(processedData(), input$seleTreat_clusterRef,
                                   input$seleZeroTreat, input$seleTimeRange)
           }
         }
         else {
-          seqMat <- processedData()[,processedData()$treatment == input$seleTreat_cluster & 
+          seqMat <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster & 
                                       processedData()$timepoint %in% input$seleTimeRange]
-          RefMat <- processedData()[,processedData()$treatment == input$seleTreat_clusterRef & 
+          RefMat <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef & 
                                       processedData()$timepoint %in% input$seleTimeRange]
         }
         # calculate fold change by subtracting assayMat to mean intensities of RefMat
@@ -1652,10 +1657,10 @@ shinyServer(function(input, output, session) {
       } 
       else if (input$clusterFor == "two-condition expression") {
         if (!is.null(input$seleZeroTreat) & input$addZero) {
-          processedDataSub <- processedData()[, processedData()$treatment == input$seleTreat_cluster]
+          processedDataSub <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster]
           allTimepoint <- unique(processedDataSub$timepoint)
           
-          processedDataRef <- processedData()[, processedData()$treatment == input$seleTreat_clusterRef]
+          processedDataRef <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef]
           timepointRef <- unique(processedDataRef$timepoint)
           # add zero timepoint samples if missing
           if (!("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
@@ -1672,7 +1677,7 @@ shinyServer(function(input, output, session) {
           else if (!("0min" %in% allTimepoint) & ("0min" %in% timepointRef)) {
             processedData1 <- addZeroTime(processedData(), input$seleTreat_cluster,
                                           input$seleZeroTreat, input$seleTimeRange)
-            processedData2 <- processedData()[, processedData()$treatment == input$seleTreat_clusterRef & 
+            processedData2 <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef & 
                                                 processedData()$timepoint %in% input$seleTimeRange]
             assay <- cbind(assay(processedData1), assay(processedData2))
             cd <- rbind(colData(processedData1), colData(processedData2))
@@ -1681,7 +1686,7 @@ shinyServer(function(input, output, session) {
             seqMat <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
           }
           else if (("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
-            processedData1 <- processedData()[, processedData()$treatment == input$seleTreat_cluster & 
+            processedData1 <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster & 
                                                 processedData()$timepoint %in% input$seleTimeRange]
             processedData2 <- addZeroTime(processedData(), input$seleTreat_clusterRef,
                                           input$seleZeroTreat, input$seleTimeRange)
@@ -1693,7 +1698,7 @@ shinyServer(function(input, output, session) {
           }
         }
         else {
-          seqMat <- processedData()[,processedData()$treatment %in% c(input$seleTreat_cluster, input$seleTreat_clusterRef) & 
+          seqMat <- processedData()[,processedData()[[input$seleMetaColTime]] %in% c(input$seleTreat_cluster, input$seleTreat_clusterRef) & 
                                       processedData()$timepoint %in% input$seleTimeRange]
         }
         yLabText <- "Normalized expression"
@@ -1703,7 +1708,7 @@ shinyServer(function(input, output, session) {
       # time is treated as a numerical variable
       plotTab <- data.frame(time = seqMat$timepoint,
                             value = assay(seqMat)[geneID,], 
-                            treatment = as.character(seqMat$treatment)) 
+                            treatment = as.character(seqMat[[input$seleMetaColTime]])) 
       timeUnit <- str_extract(plotTab$time, "h|min")
       timeUnit <- ifelse(is.na(timeUnit), "", timeUnit)
       if ((any(timeUnit == "h")) & (any(timeUnit == "min"))) {
