@@ -12,7 +12,8 @@ shinyServer(function(input, output, session) {
   # a reactive val to store the multiassayexperiment object
   mae <- reactiveVal()
   
-  # a reactive val to store the mae after normalization adjustment, this is used for updating PP/FP ratio plot
+  # a reactive val to store the mae after normalization adjustment
+  # this is used for updating PP/FP ratio plot
   maeAdj <- reactiveVal()
   
   # a reactive variable to stored the processed and unfiltered assay
@@ -175,11 +176,11 @@ shinyServer(function(input, output, session) {
     if (input$assay == "Phosphoproteome") {
       inputsValue$getFP <- input$getFP
       if (input$getFP) {
-        ppe <- se[,se$sampleType == "FullProteome"]
+        ppe <- se[,se$sampleType %in% c("FullProteome", "FP")]
         colData(ppe) <- colData(se)[colnames(ppe),]
       }
       else {
-        ppe <- se[,se$sampleType == "Phospho"]
+        ppe <- se[,se$sampleType %in% c("Phospho", "PP")]
         colData(ppe) <- colData(se)[colnames(ppe),]
       }
       ppe
@@ -187,11 +188,11 @@ shinyServer(function(input, output, session) {
     else if (input$assay == "Proteome") {
       inputsValue$getPP <- input$getPP
       if (input$getPP) {
-        fpe <- se[,se$sampleType == "Phospho"]
+        fpe <- se[,se$sampleType %in% c("Phospho", "PP")]
         colData(fpe) <- colData(se)[colnames(fpe),]
       }
       else {
-        fpe <- se[,se$sampleType == "FullProteome"]
+        fpe <- se[,se$sampleType %in% c("FullProteome", "FP")]
         colData(fpe) <- colData(se)[colnames(fpe),]
       }
       fpe
@@ -199,7 +200,7 @@ shinyServer(function(input, output, session) {
   })
   
   
-  #----------------------------------------------------------------------------------------------------------
+  #-----------------------------------------------------------------------------
   # launching MatrixQCvis from the phosphoproteomics app
   # observeEvent(input$launch_app, {
   #   mae <- readRDS(input$upload$datapath)
@@ -217,11 +218,11 @@ shinyServer(function(input, output, session) {
       footer = NULL
     ))
   })
-  #-----------------------------------------------------------------------------------------------------------
+  #-----------------------------------------------------------------------------
   
   # rendering options for the phospho-enriched or non-enriched sample type 
   
-  #wether to normalize phosphodata with proteomic data
+  # whether to normalize phospho data with proteomic data
   output$ifNormByProteinBox <- renderUI({
       if (!is.null(mae())) {
           if (input$assay == "Phosphoproteome" & "Proteome" %in% names(assays(mae()))) {
@@ -276,8 +277,8 @@ shinyServer(function(input, output, session) {
           maeAdj(maeData)
         } 
          
-        #wehther normalize the phospho intensity by protein expression, 
-          #if normalization adjustment is performed, this will be performed after normalization adjustment
+        # whether normalize the phospho intensity by protein expression, 
+        # if normalization adjustment is performed, this will be performed after normalization adjustment
         if (input$ifNormByProtein) {
             inputsValue$ifNormByProtein <- input$ifNormByProtein
             maeData <- SmartPhos::normByFullProteome(maeData)
@@ -317,7 +318,7 @@ shinyServer(function(input, output, session) {
         processedDataUF(pp)
       }
       
-      #log 
+      # log 
       inputsValue$transform <- input$transform
       inputsValue$normalize <- input$normalize
       inputsValue$missFilter <- input$missFilter
@@ -442,7 +443,7 @@ shinyServer(function(input, output, session) {
     g
   })
   
-  ############################################## PCA ########################################################
+  ####################################### PCA ##################################
   
   output$messagePCA <- renderText({
     if (is.null(processedData())) {
@@ -550,7 +551,7 @@ shinyServer(function(input, output, session) {
     )
   })
   
-  ######################################################## heat map ##########################################################################
+  ################################# heat map ###################################
   
   # rendering column annotation option for heatmap
   output$colAnnoBoxHM <- renderUI({
@@ -723,7 +724,7 @@ shinyServer(function(input, output, session) {
              limitsize = FALSE)
   })
   
-  ###################################################### differential expression ####################################################
+  ############################ differential expression #########################
   
   
   # select sample by sample name
@@ -1111,7 +1112,7 @@ shinyServer(function(input, output, session) {
       }
     }
   })
-  #################################################### time series clustering ##################################################
+  ############################ time series clustering ##########################
   
   #### Widgets
   output$seleMetaColBoxTime <- renderUI({
@@ -1309,7 +1310,7 @@ shinyServer(function(input, output, session) {
       assayMat <- assay(processedDataSub)
       RefMat <- assay(processedDataRef)
       # calculate fold change by subtracting assayMat to mean intensities of RefMat
-      #  here the mean intensities in RefMat are calculated per time point or per time point and subject ID.
+      # here the mean intensities in RefMat are calculated per time point or per time point and subject ID.
       if (!is.null(processedData()$subjectID)) {
         fcMat <- lapply(unique(processedDataSub$timepoint), function(tp) {
           lapply(unique(processedDataSub$subjectID), function(id) {
@@ -1738,7 +1739,7 @@ shinyServer(function(input, output, session) {
     }
   })
   
-  ################################## Enrichment analysis on DE or time-series clustering result #############################
+  ############################ Enrichment analysis #############################
   
   # reactiveVal for file path
   filePath <- reactiveVal(value = NULL)
@@ -2601,7 +2602,7 @@ shinyServer(function(input, output, session) {
     } else output$errMsg2 <- renderText("Please run enrichment analysis first! (Enrichment on time series clusters not supported yet)")
   })
   
-  ############################################ Kinase activity inference #############################################
+  ########################## Kinase activity inference #########################
   
   ####Widgets
   
@@ -2946,7 +2947,7 @@ shinyServer(function(input, output, session) {
     }
   )
   
-  ############################################## log info ##############################################
+  ################################# log info ###################################
   
   infoTable <- read.delim(file = 'infoTable.tsv', sep = '\t')
   

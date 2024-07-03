@@ -29,7 +29,7 @@ medianNorm <- function(x, method = "median") {
 performCombinedNormalization <- function(maeData) {
   
   # get count matrix from FP samples
-  setFP <- maeData[,maeData$sampleType == "FullProteome"]
+  setFP <- maeData[,maeData$sampleType %in% c("FullProteome", "FP")]
   protFP <- assay(setFP[["Proteome"]])
   phosFP <- assay(setFP[["Phosphoproteome"]])
   comFP <- rbind(protFP, phosFP)
@@ -51,21 +51,21 @@ getRatioMatrix <- function(maeData, normalization = FALSE, getAdjustedPP = FALSE
   stopifnot(is.logical(normalization))
   
   if (!getAdjustedPP) {
-    phosPP <- log2(assay(maeData[,maeData$sampleType == "Phospho"][["Phosphoproteome"]]))
+    phosPP <- log2(assay(maeData[,maeData$sampleType %in% c("Phospho", "PP")][["Phosphoproteome"]]))
   } else {
-    phosPP <- log2(assays(maeData[,maeData$sampleType == "Phospho"][["Phosphoproteome"]])[["Intensity_adjusted"]])
+    phosPP <- log2(assays(maeData[,maeData$sampleType %in% c("Phospho", "PP")][["Phosphoproteome"]])[["Intensity_adjusted"]])
   }
   
   if (!normalization) {
-    phosFP <- log2(assay(maeData[,maeData$sampleType == "FullProteome"][["Phosphoproteome"]]))
+    phosFP <- log2(assay(maeData[,maeData$sampleType %in% c("FullProteome", "FP")][["Phosphoproteome"]]))
   } 
   else  {
     phosFP <- performCombinedNormalization(maeData)
   }
   
   # use the sample name without prefix as column name
-  colnames(phosFP) <- maeData[,maeData$sampleType == "Phospho"]$sampleName
-  colnames(phosPP) <- maeData[,maeData$sampleType == "FullProteome"]$sampleName
+  colnames(phosFP) <- maeData[,maeData$sampleType %in% c("Phospho", "PP")]$sampleName
+  colnames(phosPP) <- maeData[,maeData$sampleType %in% c("FullProteome", "FP")]$sampleName
   
   # get ratio matrix
   allSmp <- intersect(colnames(phosFP), colnames(phosPP))
@@ -82,9 +82,9 @@ plotLogRatio <- function(maeData, normalization = FALSE) {
     
   ratioMat <- getRatioMatrix(maeData, normalization)
   
-  phosPP <- log2(assay(maeData[,maeData$sampleType == "Phospho"][["Phosphoproteome"]]))
+  phosPP <- log2(assay(maeData[,maeData$sampleType %in% c("Phospho", "PP")][["Phosphoproteome"]]))
   medianPP <- colMedians(phosPP,na.rm = TRUE)
-  names(medianPP) <- maeData[,maeData$sampleType == "Phospho"]$sampleName
+  names(medianPP) <- maeData[,maeData$sampleType %in% c("Phospho", "PP")]$sampleName
   
   plotTab <- as_tibble(ratioMat, rownames = "feature") %>%
     pivot_longer(-feature) %>%
@@ -165,11 +165,11 @@ runPhosphoAdjustment <- function(maeData, normalization = FALSE, minOverlap = 3,
   
   # add adjusting factor to sample annotation  
   adjFac[names(optRes$par)] <- optRes$par
-  ppName <- colnames(maeData[,maeData$sampleType == "Phospho"][["Phosphoproteome"]])
+  ppName <- colnames(maeData[,maeData$sampleType %in% c("Phospho", "PP")][["Phosphoproteome"]])
   adjFac <- structure(adjFac[maeData[,ppName]$sampleName], names = ppName)
   maeData$adjustFactorPP <- unname(adjFac[match(rownames(colData(maeData)),names(adjFac))])
   # adjust phospho measurement on PP samples
-  phosMat <- assay(maeData[,maeData$sampleType == "Phospho"][["Phosphoproteome"]])
+  phosMat <- assay(maeData[,maeData$sampleType %in% c("Phospho", "PP")][["Phosphoproteome"]])
   phosMat <- t(t(phosMat)*(2^adjFac))
   assays(maeData[["Phosphoproteome"]])[["Intensity_adjusted"]] <- assays(maeData[["Phosphoproteome"]])[["Intensity"]]
   assays(maeData[["Phosphoproteome"]])[["Intensity_adjusted"]][,colnames(phosMat)] <- phosMat
@@ -223,8 +223,8 @@ plotAdjustmentResults <- function(maeData, normalization = FALSE) {
   
   # for phosphomeasurement of PP samples before and after adjustment
   
-  ppMat.adj <- assays(maeData[,maeData$sampleType == "Phospho"][["Phosphoproteome"]])[["Intensity_adjusted"]] 
-  ppMat.ori <- assays(maeData[,maeData$sampleType == "Phospho"][["Phosphoproteome"]])[["Intensity"]] 
+  ppMat.adj <- assays(maeData[,maeData$sampleType %in% c("Phospho", "PP")][["Phosphoproteome"]])[["Intensity_adjusted"]] 
+  ppMat.ori <- assays(maeData[,maeData$sampleType %in% c("Phospho", "PP")][["Phosphoproteome"]])[["Intensity"]] 
   ppPlotTab <- bind_rows(pivot_longer(as_tibble(ppMat.ori, rownames = "id"), -id, names_to = "sample", values_to = "count") %>% mutate(adjustment = "before adjustment"),
                          pivot_longer(as_tibble(ppMat.adj, rownames = "id"), -id, names_to = "sample", values_to = "count") %>% mutate(adjustment = "after adjustment")) %>%
     mutate(adjustment = factor(adjustment, levels = c("before adjustment","after adjustment")),
@@ -266,10 +266,10 @@ preprocessProteome <- function(seData, filterList = NULL, missCut = 50,
   if (getPP) {
     # normally only full proteome samples (FP) are used for protein analysis.
     # but if the user wishes, PP samples can also be retrieved. 
-    fpe <- seData[,seData$sampleType == "Phospho"]
+    fpe <- seData[,seData$sampleType %in% c("Phospho", "PP")]
     colData(fpe) <- colData(seData)[colnames(fpe),]
   } else {
-    fpe <- seData[,seData$sampleType == "FullProteome"]
+    fpe <- seData[,seData$sampleType %in% c("FullProteome", "FP")]
     colData(fpe) <- colData(seData)[colnames(fpe),]
   }
   
@@ -405,10 +405,10 @@ preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
     if (getFP) { 
       # normally PP samples are used for phosphoproteomic, but if the user wishes,
       # FP sample can be used.
-      ppe <- seData[,seData$sampleType == "FullProteome"]
+      ppe <- seData[,seData$sampleType %in% c("FullProteome", "FP")]
       colData(ppe) <- colData(seData)[colnames(ppe),]
     } else {
-      ppe <- seData[,seData$sampleType == "Phospho"]
+      ppe <- seData[,seData$sampleType %in% c("Phospho", "PP")]
       colData(ppe) <- colData(seData)[colnames(ppe),]
     }
   } else {
