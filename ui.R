@@ -6,7 +6,7 @@
 
 # The top level navigation UI for the app
 navbarPage("SmartPhos explorer",
-           theme = shinytheme("flatly"),
+           theme =  shinytheme("flatly"),
            useShinyjs(),
            
            tags$style(type="text/css",

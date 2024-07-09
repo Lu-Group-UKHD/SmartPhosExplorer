@@ -12,26 +12,88 @@ getOneSymbol <- function(Gene) {
 
 ########################################## Normalization Correction ######################################
 
-# function for median or mean normalization
+
+#' @name medianNorm
+#' 
+#' @title Normalize a Matrix Using Median or Mean
+#'
+#' @description
+#' `medianNorm` normalizes the columns of a matrix by either the median or the mean.
+#'
+#' @param x A numeric matrix to be normalized.
+#' @param method A character string specifying the normalization method. Options are `"median"` or `"mean"`. Default is `"median"`.
+#'
+#' @return A numeric matrix with normalized columns.
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item If the `method` is `"median"`, it calculates the median of each column and adjusts by the overall median of these medians.
+#'   \item If the `method` is `"mean"`, it calculates the mean of each column and adjusts by the overall mean of these means.
+#'   \item It constructs a matrix of these adjusted values and subtracts it from the original matrix to normalize the columns.
+#' }
+#'
+#' @examples
+#' # Example usage:
+#' x <- matrix(rnorm(20), nrow=5, ncol=4)
+#' normalized_x <- medianNorm(x, method = "median")
+#' print(normalized_x)
+#'
+#' @importFrom matrixStats colMedians
+#' @export
 medianNorm <- function(x, method = "median") {
   if (method == "median") {
-    mVal <- matrixStats::colMedians(x, na.rm=TRUE)
-    mVal <- mVal - median(mVal, na.rm=TRUE)
+    # Calculate the median of each column, ignoring NA values
+    mVal <- matrixStats::colMedians(x, na.rm = TRUE)
+    # Adjust by the overall median of these medians
+    mVal <- mVal - median(mVal, na.rm = TRUE)
   } else if (method == "mean") {
-    mVal <- colMeans(x, na.rm=TRUE)
-    mVal <- mVal - mean(mVal, na.rm=TRUE)
+    # Calculate the mean of each column, ignoring NA values
+    mVal <- colMeans(x, na.rm = TRUE)
+    # Adjust by the overall mean of these means
+    mVal <- mVal - mean(mVal, na.rm = TRUE)
   }
   mMat <- matrix(rep(mVal, each = nrow(x)), ncol =ncol(x))
   return(x-mMat)
 }
 
 # function for performing normalization of FP and PP samples
+
+#' @name performCombinedNormalization
+#' 
+#' @title Perform Combined Normalization on MultiAssayExperiment Data
+#'
+#' @description
+#' `performCombinedNormalization` performs combined normalization on proteome and phosphoproteome data from a MultiAssayExperiment object.
+#'
+#' @param maeData A MultiAssayExperiment object containing proteome and phosphoproteome data.
+#'
+#' @return A numeric matrix with normalized and log2-transformed data.
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Extracts the count matrices for Full Proteome (FP) samples.
+#'   \item Combines the proteome and phosphoproteome data into a single matrix.
+#'   \item Removes rows with all NA values.
+#'   \item Performs median normalization and log2 transformation on the combined matrix.
+#' }
+#'
+#' @examples
+#' # Example usage:
+#' # Assuming maeData is a MultiAssayExperiment object with appropriate data
+#' # normalized_data <- performCombinedNormalization(maeData)
+#' # print(normalized_data)
+#'
+#' @importFrom MultiAssayExperiment assay
+#' @export
 performCombinedNormalization <- function(maeData) {
   
-  # get count matrix from FP samples
+  # get count matrix from FP (Full Proteome) samples
   setFP <- maeData[,maeData$sampleType %in% c("FullProteome", "FP")]
   protFP <- assay(setFP[["Proteome"]])
   phosFP <- assay(setFP[["Phosphoproteome"]])
+  # Combine proteome and phosphoproteome data into a single matrix
   comFP <- rbind(protFP, phosFP)
   comFP <- comFP[rowSums(!is.na(comFP))>0,]
   
@@ -41,21 +103,41 @@ performCombinedNormalization <- function(maeData) {
   return(comFP.norm)
 }
 
+
+#' @name getRatioMatrix
+#' 
+#' @title Get Ratio Matrix of Phosphoproteome Data
+#'
+#' @description
+#' `getRatioMatrix` calculates the ratio matrix of phosphoproteome data from a MultiAssayExperiment object.
+#'
+#' @param maeData A MultiAssayExperiment object containing phosphoproteome and full proteome data.
+#' @param normalization A logical value indicating whether to perform normalization. Default is `FALSE`.
+#' @param getAdjustedPP A logical value indicating whether to use adjusted phosphoproteome data. Default is `FALSE`.
+#'
+#' @return A numeric matrix representing the ratio of intensity of PP (phosphoproteome) data to FP (full proteome) data.
+#'
+#' @examples
+#' # Example usage:
+#' # Assuming maeData is a MultiAssayExperiment object with appropriate data
+#' # ratio_matrix <- getRatioMatrix(maeData, normalization = TRUE, getAdjustedPP = TRUE)
+#' # print(ratio_matrix)
+#'
+#' @importFrom MultiAssayExperiment assay assays
+#' @export
 getRatioMatrix <- function(maeData, normalization = FALSE, getAdjustedPP = FALSE) {
-  # Get the ratios of phospho-proteins (or peptides) intensity in PP samples 
-  # devided by FP samples 
-  # maeData: multiAssayExpriment output from SmartPhos package
-  # normalization: whether normalization needs to be performed on fullProteome
-  # samples. Normalization is necessary if normalization has not been performed
-  # by Spectronaut.
+  
+  # Ensure the normalization parameter is logical
   stopifnot(is.logical(normalization))
   
+  # Extract and log-transform phosphoproteome data based on getAdjustedPP flag
   if (!getAdjustedPP) {
     phosPP <- log2(assay(maeData[,maeData$sampleType %in% c("Phospho", "PP")][["Phosphoproteome"]]))
   } else {
     phosPP <- log2(assays(maeData[,maeData$sampleType %in% c("Phospho", "PP")][["Phosphoproteome"]])[["Intensity_adjusted"]])
   }
   
+  # Extract and log-transform full proteome data, with optional normalization
   if (!normalization) {
     phosFP <- log2(assay(maeData[,maeData$sampleType %in% c("FullProteome", "FP")][["Phosphoproteome"]]))
   } 
@@ -63,11 +145,11 @@ getRatioMatrix <- function(maeData, normalization = FALSE, getAdjustedPP = FALSE
     phosFP <- performCombinedNormalization(maeData)
   }
   
-  # use the sample name without prefix as column name
+  # Use the sample name without prefix as column name
   colnames(phosFP) <- maeData[,maeData$sampleType %in% c("Phospho", "PP")]$sampleName
   colnames(phosPP) <- maeData[,maeData$sampleType %in% c("FullProteome", "FP")]$sampleName
   
-  # get ratio matrix
+  # Calculate the ratio matrix
   allSmp <- intersect(colnames(phosFP), colnames(phosPP))
   allRow <- intersect(rownames(phosFP), rownames(phosPP))
   ratioMat <- phosPP[allRow, allSmp] - phosFP[allRow, allSmp]
@@ -77,20 +159,50 @@ getRatioMatrix <- function(maeData, normalization = FALSE, getAdjustedPP = FALSE
   
 }
 
+
+# plot the log ration of PP/FP intensities
+
+
+#' @name plotLogRatio
+#' 
+#' @title Plot Log Ratio of PP/FP (Phosphoproteome to Full Proteome) intensities
+#'
+#' @description
+#' `plotLogRatio` generates a boxplot of the log2 ratio of intensities of phosphoproteome to full proteome data from a MultiAssayExperiment object.
+#'
+#' @param maeData A MultiAssayExperiment object containing phosphoproteome and full proteome data.
+#' @param normalization A logical value indicating whether to perform normalization. Default is `FALSE`.
+#'
+#' @return A ggplot object representing the boxplot of the log2 ratios.
+#'
+#' @examples
+#' # Example usage:
+#' # Assuming maeData is a MultiAssayExperiment object with appropriate data
+#' # plot <- plotLogRatio(maeData, normalization = TRUE)
+#' # print(plot)
+#'
+#' @importFrom MultiAssayExperiment assay
+#' @importFrom matrixStats colMedians
+#' @importFrom tibble as_tibble
+#' @importFrom tidyr pivot_longer
+#' @importFrom dplyr filter mutate
+#' @importFrom ggplot2 ggplot aes geom_boxplot ggtitle xlab ylab geom_hline theme element_text
+#' @export 
 plotLogRatio <- function(maeData, normalization = FALSE) {
-  # plot the log ration of PP/FP intensities
-    
+  # Calculate the ratio matrix of phosphoproteome to full proteome data
   ratioMat <- getRatioMatrix(maeData, normalization)
-  
+  # Extract and log-transform phosphoproteome data
   phosPP <- log2(assay(maeData[,maeData$sampleType %in% c("Phospho", "PP")][["Phosphoproteome"]]))
   medianPP <- colMedians(phosPP,na.rm = TRUE)
   names(medianPP) <- maeData[,maeData$sampleType %in% c("Phospho", "PP")]$sampleName
   
+  # Create a table for plotting
   plotTab <- as_tibble(ratioMat, rownames = "feature") %>%
     pivot_longer(-feature) %>%
     filter(!is.na(value)) %>%
     mutate(medianPP = medianPP[name])
   
+  # Generate a ggplot boxplot of the log2 ratios
   ggplot(plotTab, aes(x=name, y=value)) +
     geom_boxplot(aes(fill = medianPP)) +
     ggtitle("Boxplot of Phospho/FullProteome Ratio") +
@@ -102,12 +214,32 @@ plotLogRatio <- function(maeData, normalization = FALSE) {
   
 }
 
+# check the PP/FP ratio matrix and remove feature that do not meet requirements
+
+#' @name checkRatioMat
+#' 
+#' @title Check the PP/FP ratio matrix and remove feature that do not meet requirements
+#'
+#' @description
+#' `checkRatioMat` checks the ratio matrix for samples that do not have sufficient overlap of phospho-peptides between enriched (PP) and unenriched (FP) samples.
+#'
+#' @param ratioMat A numeric matrix representing the ratio of phosphoproteome data to full proteome data.
+#' @param minOverlap An integer specifying the minimum number of overlapping peptides required between samples. Default is `3`.
+#'
+#' @return A character vector of sample names that do not meet the overlap criteria.
+#'
+#' @examples
+#' # Example usage:
+#' # Assuming ratioMat is a matrix with appropriate data
+#' # excluded_samples <- checkRatioMat(ratioMat, minOverlap = 3)
+#' # print(excluded_samples)
+#'
+#' @export
 checkRatioMat <- function(ratioMat, minOverlap = 3) {
-  # check the PP/FP ratio matrix and remove feature that do not meet requirements
-    
+  # Initialize a list to keep track of excluded samples
   excludeSampleList <- c()
   
-  # are there any samples that don't have any phospho sites detect in both FP and PP samples?
+  # Identify samples that don't have any phospho sites detect in both FP and PP samples
   noOverSmp <- colnames(ratioMat)[colSums(!is.na(ratioMat))==0]
   if (length(noOverSmp) >0) {
     warning(paste0("Below samples don't have phopho-peptides detected in both enriched (PP) and unenriched (FP) samples and therefore adjusting factor will set to 0 (no adjustment) for them:\n",
@@ -115,9 +247,10 @@ checkRatioMat <- function(ratioMat, minOverlap = 3) {
     excludeSampleList <- c(excludeSampleList, noOverSmp)
   }
   
+  # Remove the identified samples from the ratio matrix
   ratioMat <- ratioMat[, !colnames(ratioMat) %in% noOverSmp]
   
-  # are there any samples don't have enough peptide overlap with other samples?
+  # Check for samples that do not have enough peptide overlap with other samples
   pairOverlap <- sapply(colnames(ratioMat), function(n) {
     subMat <- ratioMat[!is.na(ratioMat[,n]),]
     minOver <- min(colSums(!is.na(subMat)))
@@ -134,41 +267,82 @@ checkRatioMat <- function(ratioMat, minOverlap = 3) {
   return(excludeSampleList)
 }
 
+
+
+#' @name runPhosphoAdjustment
+#' 
+#' @title Run Phospho Adjustment
+#'
+#' @description
+#' `runPhosphoAdjustment` performs phospho adjustment on a MultiAssayExperiment object to normalize the phosphoproteome data.
+#'
+#' @param maeData A MultiAssayExperiment object containing phosphoproteome and full proteome data.
+#' @param normalization A logical value indicating whether to perform normalization. Default is `FALSE`.
+#' @param minOverlap An integer specifying the minimum number of overlapping peptides required between samples. Default is `3`.
+#' @param completeness A numeric value indicating the required completeness of data for features to be included. Default is `0`.
+#' @param ncore An integer specifying the number of cores to use for parallel processing. Default is `1`.
+#'
+#' @return A MultiAssayExperiment object with adjusted phosphoproteome data.
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Defines an optimization function to minimize the sum of squared differences between pairs of samples.
+#'   \item Calculates the ratio matrix of phosphoproteome to full proteome data.
+#'   \item Subsets features based on completeness criteria.
+#'   \item Performs a sanity check to identify and exclude problematic samples.
+#'   \item Sets initial values for the adjustment factor based on column medians.
+#'   \item Estimates the adjustment factor using parallel optimization.
+#'   \item Adjusts the phosphoproteome measurements using the estimated adjustment factor.
+#' }
+#'
+#' @examples
+#' # Example usage:
+#' # Assuming maeData is a MultiAssayExperiment object with appropriate data
+#' # adjusted_maeData <- runPhosphoAdjustment(maeData, normalization = TRUE, minOverlap = 3, completeness = 0.8, ncore = 2)
+#' # print(adjusted_maeData)
+#'
+#' @importFrom MultiAssayExperiment assay assays colData
+#' @importFrom matrixStats colMedians
+#' @importFrom stats optim
+#' @importFrom parallel makeCluster setDefaultCluster stopCluster
+#' @importFrom utils combn
+#' @export
 runPhosphoAdjustment <- function(maeData, normalization = FALSE, minOverlap = 3, completeness = 0, ncore = 1 ) {
   
-  # function to opitmize
+  # Function to opitmize
   esFun <- function(par, data) {
     comPair <- utils::combn(seq(length(par)), 2)
     sum(((data[comPair[1, ],] + par[comPair[1, ]]) - (data[comPair[2, ],] + par[comPair[2, ]]))^2/rowSums(!is.na(data[comPair[1,],] + data[comPair[2,],])), na.rm = TRUE)
   }
   
-  # get PP/FP ratio matrix
+  # Get PP/FP ratio matrix
   ratioMat <- getRatioMatrix(maeData, normalization = normalization)
   adjFac <- structure(rep(0, length.out = ncol(ratioMat)), names = colnames(ratioMat))
   
-  # subset features according to completeness in the ratio matrix
+  # Subset features according to completeness in the ratio matrix
   ratioMat <- ratioMat[rowSums(!is.na(ratioMat))/ncol(ratioMat) >= completeness,]
   
-  # sanity check to see if any samples need to be excluded
+  # Sanity check to see if any samples need to be excluded
   excList <- checkRatioMat(ratioMat)
   ratioMat <- ratioMat[, !colnames(ratioMat) %in% excList]
   
-  # set an initial value for B based on col medians of ratioMat, may increase search speed
+  # Set an initial value for B based on col medians of ratioMat, may increase search speed
   colMed <- apply(ratioMat,2, median, na.rm = TRUE)
   iniPar <- median(colMed) - colMed
   
-  # estimating adjusting factor
+  # Estimating adjusting factor
   cl <- makeCluster(ncore)
   setDefaultCluster(cl = cl)
   optRes <- optimParallel(par=iniPar, fn=esFun, data=t(ratioMat))
   stopCluster(cl)
   
-  # add adjusting factor to sample annotation  
+  # Add adjusting factor to sample annotation  
   adjFac[names(optRes$par)] <- optRes$par
   ppName <- colnames(maeData[,maeData$sampleType %in% c("Phospho", "PP")][["Phosphoproteome"]])
   adjFac <- structure(adjFac[maeData[,ppName]$sampleName], names = ppName)
   maeData$adjustFactorPP <- unname(adjFac[match(rownames(colData(maeData)),names(adjFac))])
-  # adjust phospho measurement on PP samples
+  # Adjust phospho measurement on PP samples
   phosMat <- assay(maeData[,maeData$sampleType %in% c("Phospho", "PP")][["Phosphoproteome"]])
   phosMat <- t(t(phosMat)*(2^adjFac))
   assays(maeData[["Phosphoproteome"]])[["Intensity_adjusted"]] <- assays(maeData[["Phosphoproteome"]])[["Intensity"]]
@@ -177,13 +351,51 @@ runPhosphoAdjustment <- function(maeData, normalization = FALSE, minOverlap = 3,
   return(maeData)
 }
 
+
+#' @name plotAdjustmentResults
+#' 
+#' @title Plot Adjustment Results
+#'
+#' @description
+#' `plotAdjustmentResults` generates plots to visualize the results of phosphoproteome adjustment.
+#'
+#' @param maeData A MultiAssayExperiment object containing phosphoproteome and full proteome data.
+#' @param normalization A logical value indicating whether normalization was performed. Default is `FALSE`.
+#'
+#' @return A list containing:
+#' \item{ratioTrendPlot}{A ggplot object showing the line plot of PP/FP ratios for features present in all samples.}
+#' \item{ratioBoxplot}{A ggplot object showing the box plot of PP/FP ratios before and after adjustment.}
+#' \item{ppBoxplot}{A ggplot object showing the box plot of phosphorylation intensities in PP samples before and after adjustment.}
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Checks if the adjustment factor is present in the sample annotation.
+#'   \item Calculates the ratio matrix before and after adjustment.
+#'   \item Creates a trend line plot for features present in all samples.
+#'   \item Creates box plots of the PP/FP ratios and phosphorylation intensities before and after adjustment.
+#' }
+#'
+#' @examples
+#' # Example usage:
+#' # Assuming maeData is a MultiAssayExperiment object with appropriate data
+#' # plots <- plotAdjustmentResults(maeData, normalization = TRUE)
+#' # print(plots$ratioTrendPlot)
+#' # print(plots$ratioBoxplot)
+#' # print(plots$ppBoxplot)
+#'
+#' @importFrom MultiAssayExperiment assay assays colData
+#' @importFrom dplyr bind_rows filter group_by mutate summarise
+#' @importFrom tidyr pivot_longer
+#' @importFrom ggplot2 aes facet_wrap geom_boxplot geom_hline geom_line geom_point ggplot ggtitle theme xlab ylab
+#' @export
 plotAdjustmentResults <- function(maeData, normalization = FALSE) {
-  
+  # Check if the adjustment factor has been applied
   if (!"adjustFactorPP" %in% colnames(colData(maeData))) {
     stop("Phosphorylation measurments have not been adjusted yet. Please perform normalization adjustment using calcAdjustFacotr function first")
   }
   
-  # visualize precursors 
+  # Visualize precursors before and after adjustment
   ratioMat.ori <- getRatioMatrix(maeData, normalization = normalization, getAdjustedPP = FALSE)
   ratioMat.adj <- getRatioMatrix(maeData, normalization = normalization, getAdjustedPP = TRUE)
   ratioPlotTab <- bind_rows(pivot_longer(as_tibble(ratioMat.ori, rownames = "id"), -id, names_to = "sample", values_to = "ratio") %>% mutate(adjustment = "before adjustment"),
@@ -191,7 +403,7 @@ plotAdjustmentResults <- function(maeData, normalization = FALSE) {
     mutate(adjustment = factor(adjustment, levels = c("before adjustment","after adjustment"))) %>%
     filter(!is.na(ratio))
   
-  # for precursors present in all samples
+  # For precursors present in all samples
   featureComplete <- rownames(ratioMat.ori)[complete.cases(ratioMat.ori)]
   if (!length(featureComplete) >0) {
     warning("No feature (PP/FP ratio) has been detected in all samples. Raio trend line plot of will not be generated")
@@ -208,7 +420,7 @@ plotAdjustmentResults <- function(maeData, normalization = FALSE) {
       xlab("") + ylab("log2(PP/FP) ratio") 
   }
   
-  # for ratio box plots
+  # For ratio box plots
   medTab <- group_by(ratioPlotTab, adjustment) %>%
     summarise(medVal = median(ratio, na.rm=TRUE))
   ratioBoxplot <- ggplot(ratioPlotTab, aes(x=sample, y=ratio, fill = adjustment)) +
@@ -221,8 +433,7 @@ plotAdjustmentResults <- function(maeData, normalization = FALSE) {
     ggtitle("Box plot of all PP/FP ratios")  
   
   
-  # for phosphomeasurement of PP samples before and after adjustment
-  
+  # For phosphorylation measurements of PP samples before and after adjustment
   ppMat.adj <- assays(maeData[,maeData$sampleType %in% c("Phospho", "PP")][["Phosphoproteome"]])[["Intensity_adjusted"]] 
   ppMat.ori <- assays(maeData[,maeData$sampleType %in% c("Phospho", "PP")][["Phosphoproteome"]])[["Intensity"]] 
   ppPlotTab <- bind_rows(pivot_longer(as_tibble(ppMat.ori, rownames = "id"), -id, names_to = "sample", values_to = "count") %>% mutate(adjustment = "before adjustment"),
@@ -231,7 +442,7 @@ plotAdjustmentResults <- function(maeData, normalization = FALSE) {
            count = log2(count)) %>%
     filter(!is.na(count))
   
-  #for ratio box plots
+  # For phosphorylation intensity box plots
   medTab <- group_by(ppPlotTab, adjustment) %>%
     summarise(medVal = median(count, na.rm=TRUE))
   ppBoxplot <- ggplot(ppPlotTab, aes(x=sample, y=count, fill = adjustment)) +
@@ -249,30 +460,58 @@ plotAdjustmentResults <- function(maeData, normalization = FALSE) {
 }
 
 
-# function to preprocess proteomic data
+#' @name preprocessProteome
+#' 
+#' @title Preprocess Proteome Data
+#'
+#' @description
+#' `preprocessProteome` preprocesses proteome data stored in a SummarizedExperiment object by performing filtering, transformation, normalization, imputation, and batch effect removal.
+#'
+#' @param seData A SummarizedExperiment object containing proteome data.
+#' @param filterList A list of filters to apply on the samples. Default is `NULL`.
+#' @param missCut Numeric value specifying the missing value cutoff percentage for filtering features. Default is `50`.
+#' @param transform Character string specifying the transformation method ("log2", "vst", "none"). Default is `"log2"`.
+#' @param normalize Logical value indicating whether to normalize the data. Default is `FALSE`.
+#' @param getPP Logical value indicating whether to retrieve PP samples. Default is `FALSE`.
+#' @param removeOutlier Character vector of samples to be removed as outliers. Default is `NULL`.
+#' @param impute Character string specifying the imputation method ("QRILC", "MLE", "bpca", "missForest", "MinDet", "none"). Default is `"QRILC"`.
+#' @param batch Character vector specifying batch effects to remove. Default is `NULL`.
+#' @param verbose Logical value indicating whether to print detailed information. Default is `FALSE`.
+#' @param scaleFactorTab Data frame containing scale factors for normalization. Default is `NULL`.
+#'
+#' @return A SummarizedExperiment object with preprocessed proteome data.
+#'
+#' @examples
+#' # Example usage:
+#' # Assuming seData is a SummarizedExperiment object with appropriate data
+#' # processedData <- preprocessProteome(seData, filterList = list(sampleType = "FP"), missCut = 30, normalize = TRUE)
+#'
+#' @importFrom SummarizedExperiment colData rowData assay assays
+#' @importFrom dplyr filter mutate
+#' @importFrom tidyr pivot_longer
+#' @importFrom DEP impute
+#' @importFrom limma removeBatchEffect
+#' @importFrom missForest missForest
+#' @importFrom doParallel registerDoParallel
+#' @importFrom doRNG registerDoRNG
+#' @export
 preprocessProteome <- function(seData, filterList = NULL, missCut = 50,
                                transform = "log2", normalize = FALSE, getPP = FALSE,
                                removeOutlier = NULL, impute = "QRILC", batch = NULL,
                                verbose = FALSE, scaleFactorTab = NULL) {
   
-  # seData, is the multiAassayExperiment object from SmartPhos
-  # filterList, is a list object where users can filter the samples based on sample annotations.
-  # missCut, is the maximal missing value percentage allowed
-  # getPP, is whether to get PP sample instead of default FP samples
-  # removeOutlier, can be a character vector contains the outlier samples to be removed from preprocessing.
-  # verbose,  whether to show additional information
-  # scaleFactor, for user-specified scale factor. Not useful for the shiny app for now.
-  
+  # Retrieve desired sample type
   if (getPP) {
-    # normally only full proteome samples (FP) are used for protein analysis.
-    # but if the user wishes, PP samples can also be retrieved. 
+    # Retrieve PP samples if specified
     fpe <- seData[,seData$sampleType %in% c("Phospho", "PP")]
     colData(fpe) <- colData(seData)[colnames(fpe),]
   } else {
+    # Otherwise, retrieve FullProteome samples
     fpe <- seData[,seData$sampleType %in% c("FullProteome", "FP")]
     colData(fpe) <- colData(seData)[colnames(fpe),]
   }
   
+  # Remove specified outliers
   if (length(removeOutlier) > 0) {
     if (length(removeOutlier) > 1) {
       for (i in removeOutlier) {
@@ -284,23 +523,26 @@ preprocessProteome <- function(seData, filterList = NULL, missCut = 50,
     }
   }
   
-  # filter for selected criteria
+  # Apply specified filters
   if (!is.null(filterList)) {
     for (n in names(filterList)) {
       fpe <- fpe[,fpe[[n]] %in% filterList[[n]]]
     }
   }
-  # rename column names
+  
+  # Rename columns to sample names
   colnames(fpe) <- fpe$sample
-  # get last gene name
+  
+  # Process gene names and remove features without symbols
   rowData(fpe)$Gene <- getOneSymbol(rowData(fpe)$Gene)
-  # remove features without symbols
   fpe <- fpe[!rowData(fpe)$Gene %in% c(NA,""),]
-  # filter for missing values
+  
+  # Filter features based on missing values
   countMat <- assay(fpe)
   missPer <- rowSums(is.na(countMat))/ncol(countMat)*100
   fpeSub <- fpe[missPer < missCut,]
-  # nomralization and transformation
+  
+  # Apply transformation and normalization
   if (transform=="log2") {
     if (normalize) {
       if (is.null(scaleFactorTab)) {
@@ -334,7 +576,7 @@ preprocessProteome <- function(seData, filterList = NULL, missCut = 50,
     }
   }
   
-  # imputation 
+  # Impute missing values
   if (impute != "none") {
     rowData(fpeSub)$name <- rowData(fpeSub)$UniprotID
     rowData(fpeSub)$ID <- rowData(fpeSub)$UniprotID
@@ -360,12 +602,13 @@ preprocessProteome <- function(seData, filterList = NULL, missCut = 50,
     rowData(fpeSub)$name <- NULL
     rowData(fpeSub)$ID <- NULL
     if (verbose) {
-      # show number of samples and features
+      # Show number of samples and features
       print("Number of proteins and samples:")
       print(dim(fpeSub))
       }
   }
   
+  # Remove batch effects if specified
   if(!is.null(batch)) {
     if(length(batch) == 1) {
       remBatchImp <- limma::removeBatchEffect(assays(fpeSub)[["imputed"]],
@@ -388,26 +631,55 @@ preprocessProteome <- function(seData, filterList = NULL, missCut = 50,
   return(fpeSub)
 }
 
-# Function to preprocess phospho proteomic data
+#' @name preprocessPhos 
+#' 
+#' @title Preprocess Phosphoproteome Data
+#'
+#' @description
+#' `preprocessPhos` preprocesses phosphoproteome data stored in a SummarizedExperiment object by performing filtering, transformation, normalization, imputation, and batch effect removal.
+#'
+#' @param seData A SummarizedExperiment object containing phosphoproteome data.
+#' @param filterList A list of filters to apply on the samples. Default is `NULL`.
+#' @param missCut Numeric value specifying the missing value cutoff percentage for filtering features. Default is `50`.
+#' @param transform Character string specifying the transformation method ("log2", "vst", "none"). Default is `"log2"`.
+#' @param normalize Logical value indicating whether to normalize the data. Default is `FALSE`.
+#' @param getFP Logical value indicating whether to retrieve FP samples. Default is `FALSE`.
+#' @param removeOutlier Character vector of samples to be removed as outliers. Default is `NULL`.
+#' @param assayName Character string specifying the assay name in the SummarizedExperiment object. Default is `NULL`.
+#' @param batch Character vector specifying batch effects to remove. Default is `NULL`.
+#' @param scaleFactorTab Data frame containing scale factors for normalization. Default is `NULL`.
+#' @param impute Character string specifying the imputation method ("QRILC", "MLE", "bpca", "missForest", "MinDet", "none"). Default is `"QRILC"`.
+#' @param verbose Logical value indicating whether to print detailed information. Default is `FALSE`.
+#'
+#' @return A SummarizedExperiment object with preprocessed phosphoproteome data.
+#'
+#' @examples
+#' # Example usage:
+#' # Assuming seData is a SummarizedExperiment object with appropriate data
+#' # processedData <- preprocessPhos(seData, filterList = list(sampleType = "Phospho"), missCut = 30, normalize = TRUE)
+#'
+#' @importFrom SummarizedExperiment colData rowData assay assays
+#' @importFrom dplyr filter mutate
+#' @importFrom tidyr pivot_longer
+#' @importFrom DEP impute
+#' @importFrom limma removeBatchEffect
+#' @importFrom missForest missForest
+#' @importFrom doParallel registerDoParallel
+#' @importFrom doRNG registerDoRNG
+#' @export
 preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
                            transform="log2", normalize = FALSE, getFP = FALSE,
                            removeOutlier = NULL, assayName = NULL, batch = NULL,
                            scaleFactorTab = NULL, impute = "QRILC", verbose = FALSE) {
   
-  # This function is largely the same as the function above, but it's intended
-  # for processing the phosphoproteomic data there is an additional parameter,
-  # assayName, which can be used to specify an assay name beyond "Phosphoproteme"
-  # to retrieve other assay types, for example, the ratio between phospho and
-  # proteome measurement. Currently not useful for the shiny app. 
-  
-  
+  # Retrieve the desired sample type or specified assay
   if (is.null(assayName)) {
     if (getFP) { 
-      # normally PP samples are used for phosphoproteomic, but if the user wishes,
-      # FP sample can be used.
+      # Retrieve FullProteome samples if specified
       ppe <- seData[,seData$sampleType %in% c("FullProteome", "FP")]
       colData(ppe) <- colData(seData)[colnames(ppe),]
     } else {
+      # Otherwise, retrieve Phospho samples
       ppe <- seData[,seData$sampleType %in% c("Phospho", "PP")]
       colData(ppe) <- colData(seData)[colnames(ppe),]
     }
@@ -416,6 +688,7 @@ preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
     colData(ppe) <- colData(seData[,colnames(ppe)])
   }
   
+  # Remove specified outliers
   if (length(removeOutlier) > 0) {
     if (length(removeOutlier) > 1) {
       for (i in removeOutlier) {
@@ -427,30 +700,30 @@ preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
     }
   }
   
-  # filter for selected criteria
+  # Apply specified filters
   if (!is.null(filterList)) {
     for (n in names(filterList)) {
       ppe <- ppe[,ppe[[n]] %in% filterList[[n]]]
     }
   }
   
-  # rename column names
+  # Rename columns to sample names
   colnames(ppe) <- ppe$sample
-  # get last gene name
+  # Get last gene name
   rowData(ppe)$Gene <- getOneSymbol(rowData(ppe)$Gene)
-  # get last phosphorylation site
+  # Get last phosphorylation site
   rowData(ppe)$Residue <- getOneSymbol(rowData(ppe)$Residue)
   rowData(ppe)$Position <- getOneSymbol(rowData(ppe)$Position)
-  # remove features without symbols
+  # Remove features without gene symbols
   ppe <- ppe[!rowData(ppe)$Gene %in% c(NA,""),]
-  # rename site
+  # Rename phosphorylation sites
   rowData(ppe)$site <- paste0(rowData(ppe)$Gene,"_",rowData(ppe)$Residue,rowData(ppe)$Position)
-  # filter for missing values
+  # Filter features based on missing values
   countMat <- assay(ppe)
   missPer <- rowSums(is.na(countMat))/ncol(countMat)*100
   ppeSub <- ppe[missPer < missCut,]
   
-  # nomralization and transformation
+  # Apply transformation and normalization
   if (transform=="log2") {
     if (normalize) {
       if (is.null(scaleFactorTab)) {
@@ -484,7 +757,7 @@ preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
     }
   }
   
-  # imputation
+  # Impute missing values
   if (impute != "none") {
     rowData(ppeSub)$name <- rowData(ppeSub)$site
     rowData(ppeSub)$ID <- rowData(ppeSub)$site
@@ -501,7 +774,7 @@ preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
         imp <- DEP::impute(ppeSub, "MinDet")  
     }
     else {
-      doParallel::registerDoParallel(cores = 6)  # set based on number of CPU cores
+      doParallel::registerDoParallel(cores = 6)  # Set number of CPU cores
       doRNG::registerDoRNG(seed = 123)
       mf <- missForest::missForest(t(assay(ppeSub)), parallelize = "forests", maxiter = 2, ntree = 50)
       imp <- t(mf$ximp)
@@ -509,13 +782,14 @@ preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
     assays(ppeSub)[["imputed"]] <- assay(imp)
     rowData(ppeSub)$name <- NULL
     rowData(ppeSub)$ID <- NULL
-    # show number of samples and features
+    # Show number of samples and features
     if (verbose) {
       print("Number of proteins and samples:")
       print(dim(ppeSub))
     }
   }
   
+  # Remove batch effects if specified
   if(!is.null(batch)) {
     if(length(batch) == 1) {
       remBatchImp <- limma::removeBatchEffect(assays(ppeSub)[["imputed"]],
@@ -538,13 +812,47 @@ preprocessPhos <- function(seData, filterList = NULL, missCut = 50,
   return(ppeSub)
 }
 
-# function to add zero timepoint samples 
+#' @name addZeroTime
+#' 
+#' @title Add Zero Timepoint Data to Treatment Subset
+#'
+#' @description
+#' `addZeroTime` adds a zero timepoint to a specific treatment's data subset.
+#'
+#' @param data A SummarizedExperiment object containing the experimental data.
+#' @param treat Character string specifying the treatment to which zero timepoint should be added.
+#' @param zeroTreat Character string specifying the treatment representing the zero timepoint.
+#' @param timeRange Character vector specifying the timepoints to include for the treatment.
+#'
+#' @return A SummarizedExperiment object with the zero timepoint added to the specified treatment's data.
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Subsets the data for the specified treatment and time range.
+#'   \item Subsets the data for the zero timepoint of the specified zero treatment.
+#'   \item Combines the assays from the treatment and zero timepoint subsets.
+#'   \item Updates the column data to reflect the combined treatment.
+#'   \item Returns a SummarizedExperiment object with the combined data.
+#' }
+#'
+#' @examples
+#' # Example usage:
+#' # Assuming data is a SummarizedExperiment object with appropriate data
+#' # result <- addZeroTime(data, treat = "TreatmentA", zeroTreat = "Control", timeRange = c("10min", "20min"))
+#'
+#' @importFrom SummarizedExperiment colData rowData assay assays elementMetadata SummarizedExperiment
+#' @export 
 addZeroTime <- function(data, treat, zeroTreat, timeRange) {
+  # Subset the data for the specified treatment and time range
   subset1 <- data[, data$treatment == treat & data$timepoint %in% timeRange]
-  subset2 <- data[, data$treatment == zeroTreat & data$timepoint == "0min"]
+  # Subset the data for the zero timepoint of the specified zero treatment
+  subset2 <- data[, data$treatment == zeroTreat & data$timepoint %in% c("0min", "0", "0h")]
+  # Combine the assays from the treatment and zero timepoint subsets
   assay <- cbind(assay(subset1), assay(subset2))
   colnames(assay) <- gsub(zeroTreat, treat, colnames(assay))
   
+  # Combine the column data from both subsets
   cd1 <- colData(subset1)
   cd2 <- colData(subset2)
   cd <- rbind(cd1, cd2)
@@ -552,36 +860,80 @@ addZeroTime <- function(data, treat, zeroTreat, timeRange) {
   cd$sample[cd$sample == zeroTreat] = treat
   rownames(cd) <- gsub(zeroTreat, treat, rownames(cd))
   
+  # Retrieve the element metadata from the original data
   emeta <- elementMetadata(data)
   
   return(SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta))
 }
 
-# Function to plot time-series clustering results
+
+#' @name clusterTS
+#' 
+#' @title Perform Clustering on Time-Series Data
+#'
+#' @description
+#' `clusterTS` performs clustering on time-series data and generates plots for visualization.
+#'
+#' @param x A numeric matrix with rows as features and columns as time points.
+#' @param k An integer specifying the number of clusters.
+#' @param pCut A numeric value specifying the probability cutoff for cluster membership. Default is `NULL`.
+#' @param twoCondition A logical value indicating if the data contains two conditions. Default is `FALSE`.
+#'
+#' @return A list containing:
+#' \item{cluster}{A tibble with clustering information for each feature.}
+#' \item{plot}{A ggplot object for visualizing the clustering results.}
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Sets a seed for reproducibility.
+#'   \item Removes rows with missing values.
+#'   \item Performs clustering using fuzzy C-means.
+#'   \item Filters clusters based on the probability cutoff if provided.
+#'   \item Generates plots for visualizing clustering results.
+#' }
+#'
+#' @examples
+#' # Example usage:
+#' # Assuming x is a numeric matrix with time-series data
+#' # result <- clusterTS(x, k = 4, pCut = 0.8, twoCondition = FALSE)
+#'
+#' @importFrom e1071 cmeans
+#' @importFrom dplyr filter left_join mutate arrange group_by ungroup
+#' @importFrom tidyr pivot_longer separate
+#' @importFrom ggplot2 ggplot aes geom_line scale_color_gradient facet_wrap theme_bw theme element_text unit
+#' @importFrom tibble as_tibble tibble
+#' @importFrom stringr str_extract str_split
+#' @importFrom magrittr %>%
+#' @export
 clusterTS <- function(x, k, pCut = NULL, twoCondition = FALSE) {
   
-  # set seed for reproducible clustering results
+  # Set seed for reproducible clustering results
   set.seed(12345)
   
-  # x, input matrix, rows as feature, columns as time points
-  # k, number of clusters
-  
-  # remove rows with NA
+  # Remove rows with NA values
   x.center <- x[complete.cases(x),]
+  
+  # Perform fuzzy C-means clustering
   res <- e1071::cmeans(x.center, k)
 
+  # Create a tibble with clustering results
   resCluster <- tibble(feature = names(res$cluster),
                        cluster = res$cluster,
                        prob = rowMax(res$membership))
   
+  # Filter clusters based on probability cutoff if provided
   if (!is.null(pCut)) resCluster <- filter(resCluster, prob >= pCut)
 
   if (!twoCondition) {
-    # get the time unit and the time levels (i.e. order of the timepoints in the plot)
+    # Handle single condition data
+    
+    # Extract unique time points and determine time unit
     timeVector <- unique(colnames(x.center))
     timeUnit <- str_extract(timeVector, "h|min")
     timeUnit <- ifelse(is.na(timeUnit), "", timeUnit)
-    # if both h and min are present, divide the min time points by 60
+    
+    # Adjust time values if both hours and minutes are present
     if ((any(timeUnit == "h")) & (any(timeUnit == "min"))) {
       timeValue <- timeVector
       timeValue[timeUnit == "min"] <- 1/60 * as.numeric(gsub("min", "", timeValue[timeUnit == "min"]))
@@ -589,9 +941,11 @@ clusterTS <- function(x, k, pCut = NULL, twoCondition = FALSE) {
     } else {
       timeRank <- rank(as.numeric(gsub("h|min", "", timeVector)))
     }
-    # the order that the time points will appear in the plot
-    timeOrder <- timeVector[order(match(timeRank, sort(timeRank)))]   
-    # plot clustering results
+    
+    # Determine the order of time points for plotting
+    timeOrder <- timeVector[order(match(timeRank, sort(timeRank)))]  
+    
+    # Prepare data for plotting
     clusterTab <- x.center %>% as_tibble(rownames = "feature") %>%
       pivot_longer(-feature, names_to = "time", values_to = "value") %>%
       left_join(resCluster, by = "feature") %>% filter(!is.na(cluster)) %>%
@@ -605,6 +959,7 @@ clusterTS <- function(x, k, pCut = NULL, twoCondition = FALSE) {
       mutate(time = factor(time, levels = timeOrder)) %>%
       mutate(time = droplevels(time))
 
+    # Generate the plot
     p <- ggplot(clusterTab, aes( x = time, y = value, group = feature)) +
       geom_line( aes(col = prob), alpha=0.8) +
       scale_color_gradient(low = "navy", high = "green") +
@@ -619,13 +974,15 @@ clusterTS <- function(x, k, pCut = NULL, twoCondition = FALSE) {
             legend.text = element_text(size = 15),
             strip.text = element_text(size=15, face = "bold"))
   } else {
-    # plot clustering for 2 conditions
-    # get the time unit and the time levels (i.e. order of the timepoints in the plot)
+    # Handle data with two conditions
+    
+    # Extract unique time points and determine time unit
     timeVector <- sapply(colnames(x.center), function(X) unlist(str_split(X, "_"))[1])
     timeVector <- unique(timeVector)
     timeUnit <- str_extract(timeVector, "h|min")
     timeUnit <- ifelse(is.na(timeUnit), "", timeUnit)
-    # if both h and min are present, divide the min time points by 60
+    
+    # Adjust time values if both hours and minutes are present
     if ((any(timeUnit == "h")) & (any(timeUnit == "min"))) {
       timeValue <- timeVector
       timeValue[timeUnit == "min"] <- 1/60 * as.numeric(gsub("min", "", timeValue[timeUnit == "min"]))
@@ -633,9 +990,11 @@ clusterTS <- function(x, k, pCut = NULL, twoCondition = FALSE) {
     } else {
       timeRank <- rank(as.numeric(gsub("h|min", "", timeVector)))
     }
-    # the order that the time points will appear in the plot
+    
+    # Determine the order of time points for plotting
     timeOrder <- timeVector[order(match(timeRank, sort(timeRank)))]
-    # plot clustering result
+    
+    # Prepare data for plotting
     clusterTab <- x.center %>% as_tibble(rownames = "feature") %>%
       pivot_longer(-feature, names_to = "timeTreat", values_to = "value") %>%
       left_join(resCluster, by = "feature") %>% filter(!is.na(cluster)) %>%
@@ -651,9 +1010,9 @@ clusterTS <- function(x, k, pCut = NULL, twoCondition = FALSE) {
       mutate(time = droplevels(time)) %>%
       mutate(geneGroup = paste0(feature,treatment))
     
+    # Generate the plot
     p <- ggplot(clusterTab, aes( x=time, y= value, group = geneGroup)) +
       geom_line( aes(alpha = prob, color= treatment)) +
-      # scale_color_gradient(low = "green", high = "red") +
       facet_wrap(~clusterNum,ncol=3, scales = "free") +
       theme_bw() +
       theme(legend.position = "bottom",
@@ -673,43 +1032,87 @@ clusterTS <- function(x, k, pCut = NULL, twoCondition = FALSE) {
 # consistent. If patient IDs are available (recognized by "subjectID" in fileTable),
 # then the changes among patients are taken into account, otherwise the
 # replicates are considered independent.
-splineFilter <- function(exprMat, subjectID = NULL, time, df, pCut, ifFDR, treatment = NULL, refTreatment = NULL) {
-  # the time points must have either no unit or in h and/or minute. 
-  # if both h and min are present, the minute time points will be converted to h
+
+
+#' @name splineFilter
+#' 
+#' @title Filter Expression Matrix Using Spline Models
+#'
+#' @description
+#' `splineFilter` filters an expression matrix based on spline models fitted to time-series data, optionally considering treatment and subject ID.
+#'
+#' @param exprMat A numeric matrix of expression data, where rows are features and columns are samples.
+#' @param subjectID An optional vector of subject IDs corresponding to columns in `exprMat`. Default is `NULL`.
+#' @param time A numeric vector representing the time points corresponding to columns in `exprMat`.
+#' @param df An integer specifying the degrees of freedom for the spline basis.
+#' @param pCut A numeric value for the p-value cutoff to filter significant features. Default is `0.05`.
+#' @param ifFDR A logical value indicating if the false discovery rate (FDR) should be used for filtering. If FALSE, raw p-values are used. Default is `FALSE`.
+#' @param treatment An optional vector of treatment labels corresponding to columns in `exprMat`. Default is `NULL`.
+#' @param refTreatment An optional reference treatment label for the `treatment` vector. Default is `NULL`.
+#'
+#' @return A filtered expression matrix containing only the features that meet the significance criteria.
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Converts time points from minutes to hours if both units are present.
+#'   \item Removes rows with missing values from the expression matrix.
+#'   \item Constructs a design matrix for the spline model, optionally including subject IDs and treatments.
+#'   \item Fits a linear model using the design matrix and performs empirical Bayes moderation.
+#'   \item Extracts significant features based on the specified p-value or FDR cutoff.
+#' }
+#'
+#' @examples
+#' # Example usage:
+#' # Assuming exprMat is a numeric matrix with expression data
+#' # filteredMat <- splineFilter(exprMat, time = timeVec, df = 4, pCut = 0.05, ifFDR = TRUE)
+#'
+#' @importFrom limma lmFit eBayes topTable
+#' @importFrom splines ns
+#' @importFrom dplyr filter as_tibble
+#' @importFrom stringr str_ends
+#' @importFrom tibble rownames_to_column
+#' @export
+splineFilter <- function(exprMat, subjectID = NULL, time, df, pCut = 0.5, ifFDR = FALSE, treatment = NULL, refTreatment = NULL) {
+  # Convert time points from minutes to hours if both units are present
   if ((all(str_ends(time,"h|min"))) & (!all(str_ends(time,"h"))) & (!all(str_ends(time,"min")))) {
     time[str_ends(time, "min")] <- 1/60 * as.numeric(gsub("min","", time[str_ends(time, "min")]))
   }
   time <- as.numeric(gsub("h|min", "", time))
   
-  # remove NA rows
+  # Remove rows with NA values from the expression matrix
   exprMat <- exprMat[complete.cases(exprMat), ]
   if (is.null(treatment)) {
-    # one condition or logFC
-    # include subjectID in designTab if provided
+    # Handle case with one condition or log fold-change
     if (is.null(subjectID)) {
+      # Create design matrix without subject IDs
       designTab <- data.frame(row.names = colnames(exprMat))
       designTab$X <- splines::ns(time, df)
       design <- model.matrix(~ 0 + X, data = designTab)
     } else { 
+      # Create design matrix with subject IDs
       designTab <- data.frame(row.names = colnames(exprMat), subjectID = subjectID)
       designTab$X <- splines::ns(time, df)
       design <- model.matrix(~ 0 + X + subjectID, data = designTab)
     }
     
+    # Fit linear model and perform empirical Bayes moderation
     fit <- lmFit(exprMat, design = design)
     fit2 <- eBayes(fit)
+    # Extract results table and filter by p-value or FDR
     resTab <- topTable(fit2, coef = seq(df), number = Inf) %>%
       as_tibble(rownames = "ID") 
     
     if (ifFDR) resTab$p <- resTab$adj.P.Val else resTab$p <- resTab$P.Value
     
     resTab <- filter(resTab, p <= pCut)
+    # Return filtered expression matrix
     
     return(exprMat[resTab$ID,])
   } else {
-    
-    # two condition clustering
+    # Handle case with two conditions
     if (is.null(subjectID)) {
+      # Create design matrix without subject IDs
       designTab <- data.frame(row.names = colnames(exprMat), treatment = treatment)
       designTab$treatment <- factor(designTab$treatment, levels = unique(treatment))
       designTab$treatment <- relevel(designTab$treatment, refTreatment)
@@ -717,6 +1120,7 @@ splineFilter <- function(exprMat, subjectID = NULL, time, df, pCut, ifFDR, treat
       designTab$X <- splines::ns(time, df)
       design <- model.matrix(~ 0 + X*treatment, data = designTab)
     } else {
+      # Create design matrix with subject IDs
       designTab <- data.frame(row.names = colnames(exprMat), subjectID = subjectID, treatment = treatment)
       designTab$treatment <- factor(designTab$treatment, levels = unique(treatment))
       designTab$treatment <- relevel(designTab$treatment, refTreatment)
@@ -724,8 +1128,12 @@ splineFilter <- function(exprMat, subjectID = NULL, time, df, pCut, ifFDR, treat
       designTab$X <- splines::ns(time, df)
       design <- model.matrix(~ 0 + subjectID + X*treatment, data = designTab)
     }
+    
+    # Fit linear model and perform empirical Bayes moderation
     fit <- lmFit(exprMat, design = design)
     fit2 <- eBayes(fit)
+    
+    # Extract results table and filter by p-value or FDR
     resTab <- topTable(fit2, coef = (ncol(design)-df+1):ncol(design), number = Inf) %>%
       as_tibble(rownames = "ID")
     
@@ -733,42 +1141,88 @@ splineFilter <- function(exprMat, subjectID = NULL, time, df, pCut, ifFDR, treat
     
     resTab <- filter(resTab, p <= pCut)
     
+    # Return filtered expression matrix
     return(exprMat[resTab$ID,])
-    
   }
 }
 
 # scaling function for clustering
+
+#' @name mscale
+#' 
+#' @title Scale and Center a Matrix
+#'
+#' @description
+#' `mscale` scales and centers each row of a matrix, with options for using mean or median, standard deviation or mean absolute deviation, and censoring extreme values.
+#'
+#' @param x A numeric matrix where rows are features and columns are samples.
+#' @param center Logical. If TRUE, the rows are centered by subtracting the mean or median. Default is `TRUE`.
+#' @param scale Logical. If TRUE, the rows are scaled by dividing by the standard deviation or mean absolute deviation. Default is `TRUE`.
+#' @param censor A numeric vector of length one or two for censoring the scaled values. 
+#' If length one, values are censored symmetrically at positive and negative values. 
+#' If length two, the first value is the lower limit and the second value is the upper limit. Default is `NULL`.
+#' @param useMad Logical. If TRUE, the mean absolute deviation is used for scaling instead of the standard deviation. Default is `FALSE`.
+#'
+#' @return A scaled and centered numeric matrix with the same dimensions as the input matrix `x`.
+#'
+#' @details
+#' The function allows for flexible scaling and centering of the rows of a matrix:
+#' \itemize{
+#'   \item If both `center` and `scale` are TRUE, rows are centered and scaled.
+#'   \item If only `center` is TRUE, rows are centered but not scaled.
+#'   \item If only `scale` is TRUE, rows are scaled but not centered.
+#'   \item If neither `center` nor `scale` is TRUE, the original matrix is returned.
+#' }
+#' The function can also censor extreme values, either symmetrically or asymmetrically, based on the `censor` parameter.
+#'
+#' @examples
+#' # Example usage:
+#' # Assuming `dataMatrix` is a numeric matrix with expression data
+#' # scaledMatrix <- mscale(dataMatrix, center = TRUE, scale = TRUE, censor = 2)
+#'
+#' @importFrom stats median sd
+#' @importFrom matrixStats rowMads
+#' @export
 mscale <- function(x, center = TRUE, scale = TRUE, censor = NULL, useMad = FALSE){
+  
+  # Check if both scaling and centering are requested
   if (scale & center) {
+    # Scale using Mean Absolute Deviation (MAD)
     if (useMad) {
       x.scaled <- apply(x, 1, function(y) (y-median(y,na.rm = T))/meanAD(y))
     } else {
+      # Scale using Standard Deviation (SD)
       x.scaled <- apply(x, 1, function(y) (y-mean(y,na.rm=T))/sd(y,na.rm = T))
     }
   } else if (center & !scale) {
+    # Only center the data
     if (useMad) {
       x.scaled <- apply(x, 1, function(y) (y-median(y,na.rm=T)))
     } else {
       x.scaled <- apply(x, 1, function(y) (y-mean(y,na.rm=T)))
     }
   } else if (!center & scale) {
+    # Only scale the data
     if (useMad) {
       x.scaled <- apply(x, 1, function(y) y/meanAD(y))
     } else {
       x.scaled <- apply(x, 1, function(y) y/sd(y,na.rm = T))
     }
   } else {
+    # Neither center nor scale
     x.scaled <- t(x)
   }
   
+  # Apply censoring if requested
   if (!is.null(censor)) {
     if (length(censor) == 1) {
+      # Symmetric censoring
       x.scaled[x.scaled > censor] <- censor
       x.scaled[x.scaled < -censor] <- -censor
     } else {
-      x.scaled[x.scaled > censor[2]] <- censor[2]  # higher limit
-      x.scaled[x.scaled < censor[1]] <- censor[1]  # lower limit
+      # Asymmetric censoring
+      x.scaled[x.scaled > censor[2]] <- censor[2]  # Upper limit
+      x.scaled[x.scaled < censor[1]] <- censor[1]  # Lower limit
     }
   }
   return(t(as.matrix(x.scaled)))
@@ -779,12 +1233,43 @@ mscale <- function(x, center = TRUE, scale = TRUE, censor = NULL, useMad = FALSE
 # ptm == TRUE Processing the database file will depend on whether the file is
 # geneset or ptm set. If ptm == TRUE, the ptmset will be used, and each geneset
 # will be split into 2 based on the sites direction of regulation (up or down).
+
+
+#' @name runFisher
+#' 
+#' @title Perform Fisher's Exact Test on Gene Sets
+#'
+#' @description
+#' `runFisher` performs Fisher's Exact Test to determine the enrichment of a set of genes within reference gene sets.
+#'
+#' @param genes A character vector of genes of interest.
+#' @param reference A character vector of reference genes.
+#' @param inputSet A list containing gene set collections. If `ptm` is TRUE, this should be a data frame with specific columns.
+#' @param ptm Logical. If TRUE, perform the test on post-translational modification (PTM) gene sets. Default is `FALSE`.
+#'
+#' @return A data frame with the results of the Fisher's Exact Test, including the gene set name, the number of genes in the set, set size, p-value, adjusted p-value, and the genes in the set.
+#'
+#' @details
+#' The function can operate in two modes: standard gene sets and PTM-specific gene sets. For PTM-specific gene sets, additional filtering and processing are performed.
+#'
+#' @examples
+#' # Example usage:
+#' # Assuming `genesOfInterest` is a vector of genes and `referenceGenes` is a vector of reference genes
+#' # and `geneSetCollection` is a list of gene sets
+#' # results <- runFisher(genesOfInterest, referenceGenes, geneSetCollection, ptm = FALSE)
+#'
+#' @importFrom dplyr filter group_by ungroup mutate bind_rows arrange tibble
+#' @importFrom tidyr separate
+#' @importFrom stats fisher.test p.adjust
+#' @export
 runFisher <- function (genes, reference, inputSet, ptm = FALSE) {
-  # retrieve the database
+  
+  # Retrieve the gene sets
   if (!ptm) {
     genesets <- inputSet$gsc
     setList <- 1:length(genesets)
   } else {
+    # Filter and process the PTM-specific gene sets
     genesets <- inputSet %>%
       filter(!grepl("KINASE", category)) %>%
       dplyr::as_tibble() %>%
@@ -797,10 +1282,12 @@ runFisher <- function (genes, reference, inputSet, ptm = FALSE) {
       as.data.frame()
     setList <- unique(genesets$signature)
   }
+  # Remove genes from the reference set that are in the genes of interest
   reference = reference[!reference %in% genes]
   
+  # Apply Fisher's Exact Test to each gene set
   rtab = lapply(setList, function(i) { 
-    # here i is the order number of a set in geneset or the name of the set in ptm set.
+    # Identify the geneset and its name
     if (!ptm) {
       geneset = genesets[[i]]
       nameSet = names(genesets)[i]
@@ -809,6 +1296,7 @@ runFisher <- function (genes, reference, inputSet, ptm = FALSE) {
       nameSet = i
     }
     
+    # Create the contingency table for Fisher's Exact Test
     RinSet = sum(reference %in% geneset)
     RninSet = length(reference) - RinSet
     GinSet = sum(genes %in% geneset)
@@ -817,9 +1305,13 @@ runFisher <- function (genes, reference, inputSet, ptm = FALSE) {
                   ncol = 2, byrow = F)
     colnames(fmat) = c("inSet", "ninSet")
     rownames(fmat) = c("genes", "reference")
+    
+    # Perform Fisher's Exact Test
     fish = fisher.test(fmat, alternative = "greater")
     pval = fish$p.value
     inSet = RinSet + GinSet
+    
+    # Return the result as a tibble
     tibble(Name = nameSet,
            `Gene.number`= GinSet, 
            `Set.size` = inSet, 
@@ -833,8 +1325,48 @@ runFisher <- function (genes, reference, inputSet, ptm = FALSE) {
   return(data.frame(rtab))
 }
 
-#perform enrichment for each cluster
+
+#' @name clusterEnrich
+#' 
+#' @title Perform Cluster Enrichment Analysis
+#'
+#' @description
+#' `clusterEnrich` performs enrichment analysis on gene clusters, using Fisher's Exact Test to determine the significance of enrichment for each cluster.
+#'
+#' @param clusterTab A data frame containing cluster information, where each row corresponds to a gene and its assigned cluster.
+#' @param se A SummarizedExperiment object containing gene expression data and metadata.
+#' @param inputSet A list or data frame of gene sets to be used for enrichment analysis.
+#' @param reference A character vector of reference genes. If NULL, it will be extracted from `se`. Default is `NULL`.
+#' @param ptm Logical. If TRUE, the function will perform enrichment analysis on post-translational modification (PTM) gene sets. Default is `FALSE`.
+#' @param adj Character. The method for adjusting p-values. Default is `"BH"`.
+#' @param filterP Numeric. The p-value threshold for filtering significant results. Default is `0.05`.
+#' @param ifFDR Logical. If TRUE, the function will use FDR-adjusted p-values for significance filtering. Default is `FALSE`.
+#'
+#' @return A list containing two elements:
+#' \itemize{
+#'   \item `table`: A data frame with enrichment results for each cluster and pathway.
+#'   \item `plot`: A ggplot object showing the significance of enrichment for each pathway across clusters.
+#' }
+#'
+#' @details
+#' The function first retrieves or computes the reference set of genes or PTM sites. It then performs enrichment analysis for each cluster using the `runFisher` function.
+#' The results are filtered based on the p-value threshold and adjusted for multiple testing if `ifFDR` is `TRUE`. The function generates a dot plot where the size and color of the points represent the significance of enrichment.
+#'
+#' @examples
+#' # Example usage:
+#' # Assuming `clusterTable` is a data frame with cluster assignments,
+#' # `summarizedExp` is a SummarizedExperiment object,
+#' # and `geneSetCollection` is a list or data frame of gene sets
+#' # results <- clusterEnrich(clusterTable, summarizedExp, geneSetCollection, ptm = FALSE)
+#'
+#' @importFrom dplyr filter mutate group_by summarise ungroup bind_rows arrange
+#' @importFrom ggplot2 ggplot geom_point aes scale_fill_gradient xlab ylab theme element_text
+#' @importFrom tidyr separate
+#' @importFrom stats p.adjust
+#' @export
 clusterEnrich <- function(clusterTab, se, inputSet, reference = NULL, ptm = FALSE, adj = "BH", filterP = 0.05, ifFDR = FALSE) {
+  
+  # If reference is not provided, derive it from the SummarizedExperiment object
   if (is.null(reference)) {
     if (ptm) {
       reference <- rowData(se)$site
@@ -843,7 +1375,10 @@ clusterEnrich <- function(clusterTab, se, inputSet, reference = NULL, ptm = FALS
       reference <- unique(rowData(se)$Gene)
     }
   } 
+  
+  # Perform Fisher's Exact Test for each unique cluster
   resTabFisher <- lapply(unique(clusterTab$cluster), function(cc) {
+    # Extract gene IDs for the current cluster
     id <- filter(clusterTab, cluster == cc)$feature
     if (ptm) {
       genes <- unique(elementMetadata(se)[id,]$site)
@@ -851,10 +1386,13 @@ clusterEnrich <- function(clusterTab, se, inputSet, reference = NULL, ptm = FALS
     else {
       genes <- unique(elementMetadata(se)[id,]$Gene)
     }
+    
+    # Run Fisher's Exact Test and annotate results with the cluster ID
     eachOut <- runFisher(genes, reference, inputSet, ptm) %>%
       mutate(cluster = cc)
   }) %>% bind_rows()
   
+  # Filter results based on significance and prepare for plotting
   if (ifFDR) {
     plotTab <- resTabFisher %>%
       filter(padj <= filterP) %>% arrange(padj) %>%
@@ -870,6 +1408,7 @@ clusterEnrich <- function(clusterTab, se, inputSet, reference = NULL, ptm = FALS
       filter(atLeast1) %>% ungroup()
   }
   
+  # Create a ggplot object for visualization of enrichment results
   p<- ggplot(plotTab, aes(x=cluster, y=Name, customdata = cluster, key = Name)) +
     geom_point(aes(size =-log10(pval),fill=-log10(pval)), shape = 21, color = "black") +
     scale_fill_gradient(low = "white", high = "red") +
@@ -883,12 +1422,30 @@ clusterEnrich <- function(clusterTab, se, inputSet, reference = NULL, ptm = FALS
 
 ###### Helper functions for kinase activity inference ################
 
-# function to build the prior knowledge phosphorylation network using OmnipathR
-# Parameter:
-## speciesRef: reference species, currently accepts either "Homo sapiens" or "Mus musculus"
-# note: dephosphorylation events are removed, but this could be left as an option?
-# Output:
-## a network of kinase- phosphorylation site interactions
+#' @name getDecouplerNetwork
+#' 
+#' @title Load Kinase-Substrate Interaction Network
+#'
+#' @description
+#' `getDecouplerNetwork` loads the kinase-substrate interaction network for a specified species from pre-defined files.
+#'
+#' @param speciesRef A character string specifying the species. Supported values are "Homo sapiens" and "Mus musculus".
+#'
+#' @return A data frame containing the kinase-substrate interaction network for the specified species.
+#'
+#' @details
+#' The function reads from tab-separated value (TSV) files located in the `omnipathR_kinase_network` directory.
+#' It supports two species: Homo sapiens and Mus musculus.
+#' 
+#' @examples
+#' # Load the human kinase-substrate interaction network
+#' human_network <- getDecouplerNetwork("Homo sapiens")
+#'
+#' # Load the mouse kinase-substrate interaction network
+#' mouse_network <- getDecouplerNetwork("Mus musculus")
+#'
+#' @importFrom utils read.table
+#' @export
 getDecouplerNetwork <- function(speciesRef) {
    
   # load network of kinase-substrate interaction from omnipathR_kinase_network folder
@@ -897,27 +1454,66 @@ getDecouplerNetwork <- function(speciesRef) {
   } else if (speciesRef == "Mus musculus") {
     decoupler_network <- read.table("omnipathR_kinase_network/Mus_musculus.tsv", sep = "\t", stringsAsFactors = FALSE)
   }
-  #print(paste("Loaded", nrow(decoupler_network), "kinase-substrate interactions from OmnipathR"))
+  
+  # Return the loaded network data
+  return(decoupler_network)
 }
 
-# function to calculate kinase score using decoupleR
-# Parameters --------------------------
-## resTab: must have 2 columns, one specifying the statistic to be used (t-statistic or logFC)
-## decoupler_network: Network of kinases and their targets derived from Omnipath
-## corrThreshold: threshold to check for colinearity in the decoupler_network
-## statType: is either "stat" or "log2FC"
-## nPerm: number of permutations for the null distribution
-# Output ---------------------------
-# A dataframe with 4 columns:
-## source: name of the kinase
-## score: inferred activity score of the kinase
-## p_value: p-value from the decoupler::run_wmean function
+
+#' @name calcKinaseScore
+#' 
+#' @title Calculate Kinase Activity Scores using `decoupleR`
+#'
+#' @description
+#' `calcKinaseScore` calculates kinase activity scores based on input data and a specified network of regulatory relationships (decoupler network).
+#'
+#' @param resTab A data frame containing the input data with columns `site`, `stat`, and `log2FC`.
+#' @param decoupler_network A data frame representing the decoupleR network with columns `source` and `target`.
+#' @param corrThreshold A numeric value specifying the correlation threshold for filtering correlated regulons. Default is `0.9.
+#' @param statType A character string specifying the type of statistic to use. Options are `"stat"` or `"log2FC"`. Default is `"stat"`.
+#' @param nPerm Number of permutations for the null distribution. Default is `100`.
+#'
+#' @return A data frame with kinase activity scores, including columns for `source`, `score`, and `p_value`.
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Removes duplicate rows based on the `site` column.
+#'   \item Filters the data to include only those sites present in the `target` column of the `decoupler_network`.
+#'   \item Prepares the input table based on the specified `statType`.
+#'   \item Intersects the input table with the decoupler network to find common regulons.
+#'   \item Checks for correlated regulons and filters out those exceeding the correlation threshold.
+#'   \item Calculates kinase activity using a weighted mean approach.
+#'   \item Processes the results to handle `NA` values and formats the output.
+#' }
+#'
+#' @examples
+#' # Example usage:
+#' resTab <- data.frame(
+#'   site = c("S1", "S2", "S3", "S4"),
+#'   stat = c(1.5, -2.3, 0.7, 1.2),
+#'   log2FC = c(0.5, -1.1, 0.3, 0.9)
+#' )
+#' decoupler_network <- data.frame(
+#'   source = c("Kinase1", "Kinase2", "Kinase3"),
+#'   target = c("S1", "S2", "S4")
+#' )
+#' result <- calcKinaseScore(resTab, decoupler_network, corrThreshold = 0.8, statType = "stat")
+#' print(result)
+#'
+#' @importFrom dplyr distinct filter select rename mutate
+#' @importFrom decoupleR intersect_regulons check_corr run_wmean
+#' @importFrom tibble column_to_rownames
+#' 
+#' @export
 calcKinaseScore <- function(resTab, decoupler_network, corrThreshold = 0.9, statType = "stat", nPerm = 100) {
-  # get differential phosphorylation sites
+  # Remove duplicate rows based on the 'site' column and keep all other columns
   resTab <- resTab %>%
     distinct(site, .keep_all = TRUE) %>%
+    # Filter the rows where 'site' is present in the 'target' column of decoupler_network
     filter(site %in% decoupler_network$target)
   
+  # Prepare the input table based on the specified statType
   if (statType == "stat") {
     inputTab <- resTab %>% select(site, stat) %>% dplyr::rename(t = stat) 
   } else if (statType == "log2FC") {
@@ -925,22 +1521,23 @@ calcKinaseScore <- function(resTab, decoupler_network, corrThreshold = 0.9, stat
   }
   rownames(inputTab) <- NULL
   inputTab <- inputTab %>% data.frame() %>% column_to_rownames("site")
+  # Intersect the input table with the decoupler network to find common regulons
   decoupler_network <- decoupleR::intersect_regulons(mat = inputTab, 
                                                      network = decoupler_network, 
                                                      .source = source, 
                                                      .target = target, 
                                                      minsize = 5)
-  # check for colinearity and remove interactions with correlation >= threshold
+  # Check for correlated regulons within the decoupler network and remove interactions with correlation >= threshold
   correlated_regulons <- decoupleR::check_corr(decoupler_network) %>%  #not necessary for now
     dplyr::filter(correlation >= corrThreshold)
   decoupler_network <- decoupler_network %>% 
     dplyr::filter(!source %in% correlated_regulons$source.2)
-  # calculate the kinase score by computing the weighted mean
+  # Calculate the kinase score by computing the weighted mean
   kinase_activity <- decoupleR::run_wmean(mat = as.matrix(inputTab), 
                                           network = decoupler_network,
                                           sparse = FALSE,
                                           times = nPerm)
-  # get the wmean statistics, replace NA scores with 0, and replace NA p_value with 1
+  # Get the wmean statistics, replace NA scores with 0, and replace NA p_value with 1
   kinase_activity <- kinase_activity %>% dplyr::filter(statistic == "wmean") %>%
     select(-statistic, -condition) %>%
     mutate(score = ifelse(is.na(score), 0, score),
@@ -948,19 +1545,62 @@ calcKinaseScore <- function(resTab, decoupler_network, corrThreshold = 0.9, stat
   return(kinase_activity)
 }
 
+
 # function to plot kinase score result for differential expression
 # Parameters ----------------------
 ## scoreTab: table containing the result of kinase activity inference
 ## nTop: how many kinase to show for each direction 
 ## pCut: threshold of p_value to highlight significance in kinase activity
 # output: a barplot of kinase score. Those with p_value lower than pCut will be highlighted red, others are grey
+
+
+#' @name plotKinaseDE
+#'
+#' @title Plot Kinase score for Differential Expression data
+#'
+#' @description 
+#' `plotKinaseDE` generates a bar plot of the top kinases associated with the differentially expressed genes based on their scores.
+#'
+#' @param scoreTab A data frame containing kinase scores with columns `source`, `score`, and `p_value`.
+#' @param nTop An integer specifying the number of top kinases to plot for each direction. Default is `10`.
+#' @param pCut A numeric value specifying the p-value cutoff for significance. Default is `0.05`.
+#'
+#' @return A ggplot object representing the bar plot of kinase score.
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Adds a column for significance based on the p-value cutoff.
+#'   \item Adds a column for the sign of the score.
+#'   \item Filters out kinases with a score of 0.
+#'   \item Selects the top `nTop` kinases by absolute score for each sign of the score.
+#'   \item Creates a bar plot with the selected kinases.
+#' }
+#'
+#' @examples
+#' # Example usage:
+#' scoreTab <- data.frame(
+#'   source = c("Kinase1", "Kinase2", "Kinase3", "Kinase4"),
+#'   score = c(2.3, -1.5, 0, 3.1),
+#'   p_value = c(0.01, 0.2, 0.05, 0.03)
+#' )
+#' plot <- plotKinaseDE(scoreTab, nTop = 3, pCut = 0.05)
+#' print(plot)
+#'
+#' @importFrom dplyr mutate filter group_by slice_max
+#' @importFrom ggplot2 ggplot aes geom_bar scale_fill_manual theme_linedraw theme element_text unit coord_flip ggtitle xlab ylab reorder
+#' @export
 plotKinaseDE <- function(scoreTab, nTop = 10, pCut = 0.05) {
   plotTab <- scoreTab %>% mutate(significance = ifelse(p_value <= pCut, paste0("p <= ",pCut), paste0("p > ",pCut)),
                                  score_sign = sign(score)) %>%
-    filter(score_sign != 0) %>%  # remove kinases whose scores are 0 in the plot
+    # Remove kinases whose scores are 0 in the plot
+    filter(score_sign != 0) %>%
+    # Group by score sign and select the top nTop kinases by absolute score
     group_by(score_sign) %>% slice_max(abs(score), n = nTop)
   p <- ggplot(plotTab, aes(x = reorder(source, score), y = score)) + 
     geom_bar(aes(fill = significance), stat = "identity") 
+  
+  # Customize the fill color based on the significance levels
   if (length(unique(plotTab$significance)) == 2) {
     p <- p + scale_fill_manual(values = c("indianred", "lightgrey"), labels = c(paste0("p <= ",pCut), paste0("p > ",pCut)))
   } else if (unique(plotTab$significance) == paste0("p > ",pCut)) {
@@ -986,16 +1626,42 @@ plotKinaseDE <- function(scoreTab, nTop = 10, pCut = 0.05) {
   return(p)
 }
 
-# function to plot the result of kinase activity inference for time-series clustering
-# Parameter -------------------------------
-## scoreTab: dataframe containing the result of kinase activity inference result for one cluster
-## pCut: threshold for highlighting significance
-## clusterName: name of the cluster (in the GUI, this is inherited from input$seleCluster)
-# Output -----------------------------------
-## a heatmap of kinase activity score. Those with p_value < pCut will be highlighted with an asterisk
+
+#' Plot Kinase Activity Time Series
+#'
+#' This function creates a heatmap to visualize the result of kinase activity inference for time-series clustering, with significant activity changes marked.
+#'
+#' @param scoreTab A data frame containing kinase activity scores, p-values, and time points.
+#' @param pCut A numeric value specifying the p-value threshold for significance. Default is `0.05`.
+#' @param clusterName A character string specifying the name of the cluster for the plot title. Default is `"cluster1"`.
+#'
+#' @return A ggplot2 object representing the heatmap of kinase activity score.
+#'
+#' @details
+#' The heatmap shows kinase activity scores over different time points. Significant activities (based on the specified p-value threshold) are marked with an asterisk (*). The color gradient represents the activity score, with blue indicating low activity, red indicating high activity, and white as the midpoint.
+#' 
+#' @examples
+#' # Example usage:
+#' scoreTab <- data.frame(
+#'   timepoint = rep(c("0h", "1h", "2h"), each = 3),
+#'   source = rep(c("KinaseA", "KinaseB", "KinaseC"), times = 3),
+#'   score = runif(9, -2, 2),
+#'   p_value = runif(9, 0, 0.1)
+#' )
+#' p <- plotKinaseTimeSeries(scoreTab)
+#' print(p)
+#'
+#' @importFrom dplyr mutate rename
+#' @importFrom ggplot2 ggplot aes geom_tile geom_text scale_fill_gradient2 scale_x_discrete scale_y_discrete theme_bw ylab xlab ggtitle theme element_text unit
+#' @export
 plotKinaseTimeSeries <- function(scoreTab, pCut = 0.05, clusterName = "cluster1") {
+  
+  # Add a significance marker based on the p-value threshold
   plotTab <- dplyr::mutate(scoreTab, sig = ifelse(p_value<=pCut, "*", ""))
+  # Rename the score column for better readability in the plot
   plotTab <- plotTab %>% rename(Activity_score = "score")
+  
+  # Create the heatmap plot
   p <- ggplot(plotTab, aes(x=timepoint, y = source,fill = Activity_score)) +
     geom_tile() +
     geom_text(aes(label = sig), vjust = 0.5, hjust = 0.5, size = 10) +
@@ -1043,23 +1709,51 @@ plotKinaseTimeSeries <- function(scoreTab, pCut = 0.05, clusterName = "cluster1"
 ## min.overlap: Minimum number of sites in the set to be considered for the analysis, default is 5.
 # -----------------------------------------
 ## The resulting enrichment score is normalized to account for differences between signature set sizes
+
+
+#' @name runGSEAforPhospho
+#' 
+#' @title Run GSEA for Phosphorylation Data
+#'
+#' @description 
+#' `runGSEAforPhospho` performs Gene Set Enrichment Analysis (GSEA) for phosphorylation data.
+#'
+#' @param geneStat A data frame containing gene statistics, with gene names as row names and a column named 'stat' for the statistics.
+#' @param ptmSetDb A data frame of post-translational modification (PTM) signature sets.
+#' @param nPerm An integer specifying the number of permutations for the null distribution.
+#' @param weight A numeric value for the weight parameter in the GSEA algorithm. If weight == 0 then the test statistics do not matter. Default is `1`.
+#' @param correl.type A character string specifying the correlation type. Options are "rank", "symm.rank", and "z.score". Default is `"rank"`.
+#' @param statistic A character string specifying the statistic to be used. Options are "Kolmogorov-Smirnov" and "area.under.RES". Default is `"Kolmogorov-Smirnov"`.
+#' @param min.overlap An integer specifying the minimum overlap required between gene sets and the input data. Default is `5`.
+#'
+#' @return A tibble with enrichment scores and associated statistics for each PTM set.
+#'
+#' @details
+#' This function runs GSEA on phosphorylation data to identify enriched PTM sets. It calculates enrichment scores and p-values for each set, normalizes the scores, and adjusts p-values for multiple testing.
+#' 
+#' @examples
+#' # Example usage:
+#' geneStat <- data.frame(stat = runif(100, -2, 2))
+#' row.names(geneStat) <- paste0("Gene", 1:100)
+#' ptmSetDb <- data.frame(signature = sample(letters, 100, replace = TRUE), category = "example", site.ptm = "p", site.direction = sample(c("u", "d"), 100, replace = TRUE))
+#' result <- runGSEAforPhospho(geneStat, ptmSetDb, nPerm = 1000)
+#' print(result)
+#'
+#' @importFrom dplyr mutate rename filter count tibble as_tibble group_by ungroup arrange bind_rows
+#' @importFrom tidyr separate
+#' @importFrom stats p.adjust
+#' @export
 runGSEAforPhospho <- function(geneStat, ptmSetDb, nPerm, weight = 1, correl.type = "rank",
                               statistic = "Kolmogorov-Smirnov", min.overlap = 5) {
-  # function from the ssGSEA publication, adapted to work with our format
-  ## #############################################################################
-  ##
-  ##           function to calculate GSEA enrichment score
-  ## - apply correlation scheme and weighting
-  ## - calculate ES
-  ## ############################################################################
+  
+  # Internal function to calculate GSEA enrichment score
   gseaScorePTM <- function (ordered.gene.list, data.expr, gene.set2, 
                             weight = 1, correl.type = "rank", gene.set.direction = NULL,
                             statistic = "Kolmogorov-Smirnov", min.overlap = 5) {
     
-    ##################################################################
-    ## function to calculate ES score
+    # Function to calculate the enrichment score (ES)
     score <- function(max.ES, min.ES, RES, gaps, valleys, statistic){
-      ## KM
+      # KM
       if( statistic == "Kolmogorov-Smirnov" ){
         if( max.ES > -min.ES ){
           ES <- signif(max.ES, digits=5)
@@ -1069,7 +1763,7 @@ runGSEAforPhospho <- function(geneStat, ptmSetDb, nPerm, weight = 1, correl.type
           arg.ES <- which.min(RES)
         }
       }
-      ## AUC
+      # AUC
       if( statistic == "area.under.RES"){
         if( max.ES > -min.ES ){
           arg.ES <- which.max(RES)
@@ -1081,62 +1775,57 @@ runGSEAforPhospho <- function(geneStat, ptmSetDb, nPerm, weight = 1, correl.type
         ES = sum(RES)
       }
       return(list(RES=RES, ES=ES, arg.ES=arg.ES))
-    } ## end function score
+    } 
     
     n.rows = length(ordered.gene.list)
     
-    ## #######################################
-    ## weighting
-    ## #######################################
+    # Apply weighting to the correlation vector
     if (weight == 0) {
       
       correl.vector <- rep(1, n.rows)
       
     } else if (weight > 0) {
-      ## if weighting is used (weight > 0), bring
-      ## 'correl.vector' into the same order
-      ## as the ordered gene list
+      # If weighting is used (weight > 0), bring 'correl.vector' into the same order as the ordered gene list
       if (correl.type == "rank") {
-        ##correl.vector <- data.array[ordered.gene.list, sample.index]
         correl.vector <- data.expr[ordered.gene.list]
         
       } else if (correl.type == "symm.rank") {
-        ##correl.vector <- data.array[ordered.gene.list, sample.index]
         correl.vector <- data.expr[ordered.gene.list]
         
         correl.vector <- ifelse(correl.vector > correl.vector[ceiling(n.rows/2)],
                                 correl.vector,
                                 correl.vector + correl.vector - correl.vector[ceiling(n.rows/2)])
       } else if (correl.type == "z.score") {
-        ##x <- data.array[ordered.gene.list, sample.index]
         x <- data.expr[ordered.gene.list]
         correl.vector <- (x - mean(x))/sd(x)
       }
     }
     
-    ## length of gene list - equals number of rows in input matrix
+    # Length of gene list is same as the number of rows in input matrix
     N = length(ordered.gene.list)
     
-    ## #####################################
-    ## directionality of the gene set
+    
+    # Sirectionality of the gene set
     if(!is.null(gene.set.direction)){
       
-      ## number of 'd' features
+      # Number of 'd' features
       d.idx <- which(gene.set.direction=='d')
       Nh.d <- length(d.idx)
       Nm.d <-  N - Nh.d
-      ## locations of 'd' features
+      
+      # Locations of 'd' features
       tag.d <- sign( match(ordered.gene.list, gene.set2[ d.idx ], nomatch=0) )
       if (weight == 0) {
         ind.d = which(tag.d == 1)} else {
           ind.d = which(tag.d == 1 & correl.vector < 0)}
       number.d = length(ind.d)
       
-      ## number of 'u' features
+      # Number of 'u' features
       u.idx <- which(gene.set.direction=='u')
       Nh.u <- length(u.idx)
       Nm.u <-  N - Nh.u
-      ## locations of 'up' features
+      
+      # Locations of 'up' features
       tag.u <- sign( match(ordered.gene.list, gene.set2[ u.idx ], nomatch=0) )
       if (weight == 0) {
         ind.u = which(tag.u == 1)} else {
@@ -1144,12 +1833,10 @@ runGSEAforPhospho <- function(geneStat, ptmSetDb, nPerm, weight = 1, correl.type
       number.u = length(ind.u)
       
       
-      ########################################
-      ## up-regulated part
-      ########################################
+      # For up-regulated genes/sites
       if(number.u > 1){
         
-        ## extract and apply weighting
+        # Extract and apply weighting
         correl.vector.u <- correl.vector[ind.u]
         correl.vector.u <- abs(correl.vector.u)^weight           ## weighting
         
@@ -1159,14 +1846,14 @@ runGSEAforPhospho <- function(geneStat, ptmSetDb, nPerm, weight = 1, correl.type
         gaps.u <- (c(ind.u-1, N) - c(0, ind.u))      ## gaps between hits
         down.u <- gaps.u/Nm.u                        ## steps down in the random walk
         
-        RES.u <- cumsum(up.u-down.u[1:length(up.u)])  # OLD: RES.u <- cumsum(c(up.u,up.u[Nh.u])-down.u)
+        RES.u <- cumsum(up.u-down.u[1:length(up.u)])  
         
         valleys.u = RES.u-up.u
         
         max.ES.u = suppressWarnings(max(RES.u))
         min.ES.u = suppressWarnings(min(valleys.u))
         
-        ## calculate final score
+        # Calculate final score
         score.res <- score(max.ES.u, min.ES.u, RES.u, gaps.u, valleys.u, statistic)
         ES.u <- score.res$ES
         arg.ES.u <- score.res$arg.ES
@@ -1181,11 +1868,9 @@ runGSEAforPhospho <- function(geneStat, ptmSetDb, nPerm, weight = 1, correl.type
         down.u=0
       }
       
-      ## ######################################
-      ## down-regulated part
-      ## ######################################
+      # For down-regulated genes/sites
       if(number.d > 1){  
-        ## extract and apply weighting
+        # Extract and apply weighting
         correl.vector.d <- correl.vector[ind.d]
         correl.vector.d <- abs(correl.vector.d)^weight           ## weighting
         
@@ -1195,13 +1880,13 @@ runGSEAforPhospho <- function(geneStat, ptmSetDb, nPerm, weight = 1, correl.type
         gaps.d <- (c(ind.d-1, N) - c(0, ind.d))
         down.d <- gaps.d/Nm.d
         
-        RES.d <- cumsum(up.d-down.d[1:length(up.d)])               ## RES.d <- cumsum(c(up.d,up.d[Nh.d])-down.d)
+        RES.d <- cumsum(up.d-down.d[1:length(up.d)])               
         valleys.d = RES.d-up.d
         
         max.ES.d = suppressWarnings(max(RES.d))
         min.ES.d = suppressWarnings(min(valleys.d))
         
-        ## calculate final score
+        # Calculate final score
         score.res <- score(max.ES.d, min.ES.d, RES.d, gaps.d, valleys.d, statistic)
         ES.d <- score.res$ES
         arg.ES.d <- score.res$arg.ES
@@ -1217,55 +1902,45 @@ runGSEAforPhospho <- function(geneStat, ptmSetDb, nPerm, weight = 1, correl.type
         up.d=0
         down.d=0
       }
-      ## ############################
-      ## make sure to meet the min.overlap
-      ## threshold
+  
+      # Make sure to meet the min.overlap threshold
       if(Nh.d == 1 & Nh.u < min.overlap | Nh.u == 1 & Nh.d < min.overlap){
         ES.u <- ES.d <- RES.u <- RES.d <- 0
         arg.ES <- arg.ES <- NA
         ind.u <- ind.d <- NULL
       }
       
-      ## ###########################
-      ## combine the results
+      # Combine the results
       ES <- ES.u - ES.d
       RES <- list(u=RES.u, d=RES.d)
       arg.ES <- c(arg.ES.u, arg.ES.d)
-      ##tag.indicator <- rep(0, N)
       correl.vector = list(u=correl.vector.u, d=correl.vector.d)
-      ##if(!is.null(ind.u))tag.indicator[ind.u] <- 1
-      ##if(!is.null(ind.d))tag.indicator[ind.d] <- -1
+
       ind <- list(u=ind.u, d=ind.d)
       step.up <- list(u=up.u, d=up.d )
-      ##                   step.down <- list(u=down.u, d=down.d )
       step.down <- list(u=1/Nm.u, d=1/Nm.d)
       gsea.results = list(ES = ES, ES.all = list(u=ES.u, d=ES.d), arg.ES = arg.ES, RES = RES, indicator = ind, correl.vector = correl.vector, step.up=step.up, step.down=step.down,
                           number.u = number.u, number.d = number.d)
       
-      ## ##############################################################
-      ##
-      ##      original ssGSEA code without directionality
-      ##
-      ## ##############################################################
       
     } else { ## end  if(!is.null(gene.set.direction))
       
+      # Without directionality
       Nh <- length(gene.set2)
       Nm <-  N - Nh
       
-      ## #####################################
-      ## match gene set to data
+      
+      # Match gene set to data
       tag.indicator <- sign(match(ordered.gene.list, gene.set2, nomatch=0))    # notice that the sign is 0 (no tag) or 1 (tag)
-      ## positions of gene set in ordered gene list
+      # Positions of gene set in ordered gene list
       ind = which(tag.indicator==1)
-      ## 'correl.vector' is now the size of 'gene.set2'
+      # 'correl.vector' is now the size of 'gene.set2'
       correl.vector <- abs(correl.vector[ind])^weight
-      ## sum of weights
+      # Sum of weights
       sum.correl = sum(correl.vector)
       
-      #########################################
-      ## determine peaks and valleys
-      ## divide correl vector by sum of weights
+      # Determine peaks and valleys
+      # Divide correl vector by sum of weights
       up = correl.vector/sum.correl     # "up" represents the peaks in the mountain plot
       gaps = (c(ind-1, N) - c(0, ind))  # gaps between ranked pathway genes
       down = gaps/Nm
@@ -1276,7 +1951,7 @@ runGSEAforPhospho <- function(geneStat, ptmSetDb, nPerm, weight = 1, correl.type
       max.ES = max(RES)
       min.ES = min(valleys)
       
-      ## calculate final score
+      # Calculate final score
       score.res <- score(max.ES, min.ES, RES[1:Nh], gaps, valleys, statistic)
       
       ES <- score.res$ES
@@ -1284,22 +1959,22 @@ runGSEAforPhospho <- function(geneStat, ptmSetDb, nPerm, weight = 1, correl.type
       RES <- score.res$RES
       
       gsea.results = list(ES = ES, arg.ES = arg.ES, RES = RES, indicator = ind, correl.vector = correl.vector, step.up=up, step.down=1/Nm)
-    } ## end else
+    } 
     
     return (gsea.results)
   }
   
   
-  # remove KINASE signature since this is analogous to the kinase activity inference part
+  # Remove KINASE signature since this is analogous to the kinase activity inference part
   ptmSetDbNoKinase <- ptmSetDb %>%
     filter(!grepl("KINASE", category))
   
-  # get the number of PTM sites for each signature
+  # Get the number of PTM sites for each signature
   ptmSiteCount <- ptmSetDbNoKinase %>%
     count(signature) %>%
     rename(no.PTM.site = "n")
   
-  # preprocessing the geneSetDatabase
+  # Preprocessing the geneSetDatabase
   phosphoSetDb <- ptmSetDbNoKinase %>%
     dplyr::as_tibble() %>%
     filter(site.ptm == "p") %>%   
@@ -1308,25 +1983,25 @@ runGSEAforPhospho <- function(geneStat, ptmSetDb, nPerm, weight = 1, correl.type
     ungroup() %>%
     separate(site.annotation, sep =  ":", into = c("site", "PubMedID"), extra="merge", fill="right")
   
-  # get the number of phospho sites for each signature
+  # Get the number of phospho sites for each signature
   phosphoSiteCount <- phosphoSetDb %>%
     count(signature) %>%
     rename(no.phospho.site = "n")
   
-  # put input data in a format compatible with gseaScorePTM
+  # Put input data in a format compatible with gseaScorePTM
   ordered.gene.list <- row.names(geneStat)
   data.expr <- geneStat$stat
   names(data.expr) <- ordered.gene.list
-  # run GSEA for each PTM set
+  # Run GSEA for each PTM set
   rtab <- lapply(phosphoSiteCount$signature, function(signature) {
-    # get number of PTM site and phospho site in the database
+    # Get number of PTM site and phospho site in the database
     nPTMsite = as.numeric(ptmSiteCount[ptmSiteCount$signature == signature, "no.PTM.site"])
     nPpSite = as.numeric(phosphoSiteCount[phosphoSiteCount$signature == signature, "no.phospho.site"])
     signatureSet = phosphoSetDb[phosphoSetDb$signature == signature,]
     gene.set2 = signatureSet$site
     gene.set.direction = signatureSet$site.direction
     gene.set.PMID = signatureSet$PubMedID
-    # calculate the gsea score
+    # Calculate the gsea score
     if (sum(row.names(geneStat) %in% gene.set2) < min.overlap) {
       enrichScoreNorm <- enrichScore <- pvalue <- number.u <- number.d <- 0
     } else {
@@ -1340,7 +2015,7 @@ runGSEAforPhospho <- function(geneStat, ptmSetDb, nPerm, weight = 1, correl.type
       } else {
         number.u <- number.d <- 0 
       }
-      # calculate the null distribution and pvalue
+      # Calculate the null distribution and pvalue
       if (nPerm == 0) {
         enrichScoreNorm = enrichScore
         pvalue = 1
