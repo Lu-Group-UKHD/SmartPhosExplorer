@@ -377,18 +377,9 @@ shinyServer(function(input, output, session) {
       dataNew
     }
   })
-
-  # Plot missing value
+  
   output$missingPlot <- renderPlot({
-    countMat <- assay(loadedData())
-    plotTab <- tibble(sample = loadedData()$sample, 
-                      perNA = colSums(is.na(countMat))/nrow(countMat))
-    ggplot(plotTab, aes(x = sample, y = 1-perNA)) +
-      geom_bar(stat = "identity") +
-      ggtitle("Percentage of sample completeness") +
-      ylab("completeness") +
-      theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0),
-            plot.title = element_text(hjust = 0.5, face = "bold"))
+    plotMissing(loadedData())
   })
   
   # to toggle between show and hide functionality
@@ -414,31 +405,12 @@ shinyServer(function(input, output, session) {
   
   # Plot boxplot
   output$boxPlot <- renderPlot({
+    inputsValue$colorBox <- input$colorBox
     if (!is.null(processedDataUF())) {
-      countMat <- assay(processedDataUF())
-      countTab <- countMat %>% as_tibble(rownames = "id") %>% 
-        pivot_longer(-id) %>%
-        filter(!is.na(value))
-      meta <- as.data.frame(colData(processedDataUF()))
+      g <- plotIntensity(processedDataUF(), input$colorBox)
     }
     else {
-      countMat <- assay(loadedData())
-      countTab <- countMat %>% as_tibble(rownames = "id") %>% 
-        pivot_longer(-id) %>%
-        filter(!is.na(value))
-      meta <- as.data.frame(colData(loadedData()))
-    }
-    countTabmeta <- left_join(countTab, meta, by = c('name' = 'sample'))
-    g <- ggplot(countTabmeta, aes(x = name, y = value)) +
-      ggtitle("Boxplot of intensities") +
-      theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0),
-            plot.title = element_text(hjust = 0.5, face = "bold"))
-    if (input$colorBox == "none"){
-      g <- g + geom_boxplot()
-    }
-    else {
-      inputsValue$colorBox <- input$colorBox
-      g <- g + geom_boxplot(aes_string(fill = input$colorBox))
+      g <- plotIntensity(loadedData(), input$colorBox)
     }
     g
   })

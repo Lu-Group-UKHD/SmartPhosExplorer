@@ -10,6 +10,106 @@ getOneSymbol <- function(Gene) {
   outStr
 }
 
+
+#' @name plotMissing 
+#' 
+#' @title Plot Missing Data Completeness
+#'
+#' @description 
+#' `plotMissing` generates a bar plot showing the completeness (percentage of non-missing values) for each sample in a SummarizedExperiment object.
+#'
+#' @param se A SummarizedExperiment object containing the assay data.
+#'
+#' @return A ggplot object showing the percentage of completeness for each sample.
+#'
+#' @details
+#' This function calculates the percentage of non-missing values for each sample in the provided SummarizedExperiment object. It then generates a bar plot where each bar represents a sample, and the height of the bar corresponds to the completeness (percentage of non-missing values) of that sample.
+#'
+#' @importFrom SummarizedExperiment assay
+#' @importFrom ggplot2 ggplot aes geom_bar ggtitle ylab theme element_text
+#' @importFrom tibble tibble
+#' @examples
+#' # Assuming 'se' is a SummarizedExperiment object:
+#' plot <- plotMissing(se)
+#' print(plot)
+#'
+#' @export
+plotMissing <- function(se) {
+  
+  # Extract the assay data from the SummarizedExperiment object
+  countMat <- assay(se)
+  
+  # Create a table with sample names and their corresponding percentage of non-missing values
+  plotTab <- tibble(sample = se$sample, 
+                    perNA = colSums(is.na(countMat))/nrow(countMat))
+  
+  # Generate the bar plot using ggplot2
+   missPlot <- ggplot(plotTab, aes(x = sample, y = 1-perNA)) +
+    geom_bar(stat = "identity") +
+    ggtitle("Percentage of sample completeness") +
+    ylab("completeness") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0),
+          plot.title = element_text(hjust = 0.5, face = "bold"))
+   
+   return(missPlot)
+}
+
+
+#' @name plotIntensity
+#' 
+#' @title Plot Intensity Boxplots
+#'
+#' @description
+#' `plotIntensity` generates boxplots of assay intensities for each sample in a SummarizedExperiment object. Optionally, the boxplots can be colored based on a specified metadata column. The function handles missing values by filtering them out before plotting.
+#'
+#' @param se A SummarizedExperiment object containing the assay data and metadata.
+#' @param color A character string specifying the metadata column to use for coloring the boxplots. Default is "none".
+#'
+#' @return A ggplot object showing boxplots of intensities for each sample.
+#'
+#' @importFrom SummarizedExperiment assay colData
+#' @importFrom ggplot2 ggplot aes geom_boxplot ggtitle theme element_text
+#' @importFrom dplyr filter left_join
+#' @importFrom tidyr pivot_longer
+#' @importFrom tibble as_tibble
+#' @examples
+#' # Assuming 'se' is a SummarizedExperiment object:
+#' plot <- plotIntensity(se, color = "group")
+#' print(plot)
+#'
+#' @export
+plotIntensity <- function(se, color = "none") {
+  
+  # Extract the assay data from the SummarizedExperiment object
+  countMat <- assay(se)
+  
+  # Convert the assay data to a tibble, pivot to long format, and filter out missing values
+  countTab <- countMat %>% as_tibble(rownames = "id") %>% 
+    pivot_longer(-id) %>%
+    filter(!is.na(value))
+  
+  # Extract metadata from the SummarizedExperiment object
+  meta <- as.data.frame(colData(se))
+  # Join the count data with metadata
+  countTabmeta <- left_join(countTab, meta, by = c('name' = 'sample'))
+  
+  # Create the ggplot object with boxplots of intensities
+  g <- ggplot(countTabmeta, aes(x = name, y = value)) +
+    ggtitle("Boxplot of intensities") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0),
+          plot.title = element_text(hjust = 0.5, face = "bold"))
+  
+  # Add color to the boxplots if a valid metadata column is specified
+  if (color == "none"){
+    g <- g + geom_boxplot()
+  }
+  else {
+    g <- g + geom_boxplot(aes_string(fill = color))
+  }
+  
+  return(g)
+}
+
 ########################################## Normalization Correction ######################################
 
 
