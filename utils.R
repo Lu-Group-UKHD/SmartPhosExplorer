@@ -110,6 +110,75 @@ plotIntensity <- function(se, color = "none") {
   return(g)
 }
 
+#' @name plotPCA
+#' 
+#' @title Plot PCA
+#'
+#' @description
+#' `plotPCA` generates a PCA plot using the results from a PCA analysis and a SummarizedExperiment object. The points on the plot can be colored and shaped based on metadata.
+#'
+#' @param pca A PCA result object, typically obtained from \code{prcomp}.
+#' @param se A SummarizedExperiment object containing the metadata.
+#' @param xaxis A character string specifying which principal component to use for the x-axis. Default is `"PC1"`.
+#' @param yaxis A character string specifying which principal component to use for the y-axis. Default is `"PC2"`.
+#' @param color A character string specifying the metadata column to use for coloring the points. Default is `"none"`.
+#' @param shape A character string specifying the metadata column to use for shaping the points. Default is `"none"`.
+#'
+#' @return A ggplot object showing the PCA plot.
+#'
+#' @details
+#' This function creates a PCA plot using the scores from a PCA result object and metadata from a SummarizedExperiment object. The x-axis and y-axis can be customized to display different principal components, and the points can be optionally colored and shaped based on specified metadata columns.
+#'
+#' @importFrom SummarizedExperiment colData
+#' @importFrom ggplot2 ggplot aes geom_point theme_bw theme labs scale_shape
+#' @importFrom dplyr left_join
+#' @importFrom tibble rownames_to_column
+#' @importFrom rlang sym
+#' @examples
+#' # Assuming 'pca' is a PCA result object and 'se' is a SummarizedExperiment object:
+#' plot <- plotPCA(pca, se, xaxis = "PC1", yaxis = "PC2", color = "group", shape = "type")
+#' print(plot)
+#'
+#' @export
+plotPCA <- function(pca, se, xaxis = "PC1", yaxis = "PC2", color = "none", shape = "none") {
+  
+  # Calculate the proportion of variance explained by each principal component
+  varExplained <- pca$sdev^2/sum(pca$sdev^2)
+  # Convert the PCA result to a data frame
+  pcaDf <- as.data.frame(pca[["x"]])
+  # Convert the metadata to a data frame
+  meta <- as.data.frame(colData(se))
+  # Join the PCA scores with the metadata
+  pcaMeta <- left_join(rownames_to_column(pcaDf),
+                       meta, by = c("rowname" = "sample"))
+  
+  # Create the initial ggplot object with labels for variance explained
+  g <- ggplot(pcaMeta, aes(x = !!sym(xaxis), y = !!sym(yaxis),
+                           text = paste("sample:", meta$sample))) +
+    theme_bw() +
+    theme(legend.position="top") +
+    labs(x=paste0(xaxis,": ",
+                  round(varExplained[as.numeric(strsplit(xaxis, "PC")[[1]][2])]*100, 1), "%"),
+         y=paste0(yaxis,": ",
+                  round(varExplained[as.numeric(strsplit(yaxis, "PC")[[1]][2])]*100, 1), "%")) +
+    scale_shape(solid = FALSE)
+  
+  # Add points to the plot with optional color and shape aesthetics
+  if (color == "none" & shape == "none") {
+    g <- g + geom_point(size = 2)
+  }
+  else if (color == "none") {
+    g <- g + geom_point(aes_string(shape = shape), size = 2)
+  }
+  else if (shape == "none") {
+    g <- g + geom_point(aes_string(color = color), size = 2)
+  }
+  else {
+    g <- g + geom_point(aes_string(color = color,
+                                   shape = shape),
+                        size = 2)
+  }
+}
 ########################################## Normalization Correction ######################################
 
 

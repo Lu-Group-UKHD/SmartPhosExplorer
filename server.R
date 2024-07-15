@@ -428,9 +428,7 @@ shinyServer(function(input, output, session) {
       output$errMsgPCA <- renderText("")
       withProgress(message = "Running principal component analysis, please wait...", {
         pca <- stats::prcomp(t(assays(processedData())[["imputed"]]), center = TRUE, scale.=TRUE)
-        # variance explained
-        varExplained <- pca$sdev^2/sum(pca$sdev^2)
-        pcaDf <- as.data.frame(pca[["x"]])
+        
         # download PCA values as tsv file
         output$downloadPCATable <- downloadHandler(
           filename = function() { paste('PCAvalues', '.tsv', sep='') },
@@ -439,12 +437,12 @@ shinyServer(function(input, output, session) {
         })
         # rendering select option for x-axis of PCA plot
         output$xaxisPCAui <- renderUI({
-          selectInput("xaxisPCA", "Select the x-axis PC", colnames(pcaDf),
+          selectInput("xaxisPCA", "Select the x-axis PC", colnames(pca[["x"]]),
                       selected = "PC1")
         })
         # rendering select option for y-axis of PCA plot
         output$yaxisPCAui <- renderUI({
-          selectInput("yaxisPCA", "Select the y-axis PC", colnames(pcaDf),
+          selectInput("yaxisPCA", "Select the y-axis PC", colnames(pca[["x"]]),
                       selected = "PC2")
         })
         # rendering color option for PCA plot
@@ -459,41 +457,16 @@ shinyServer(function(input, output, session) {
                       c("none",colnames(colData(processedData()))),
                       selected = "none")
         })
-
-        # adding colData information to pca results
-        meta <- as.data.frame(colData(processedData()))
-        pcaMeta <- left_join(rownames_to_column(pcaDf),
-                             meta, by = c("rowname" = "sample"))
         
         plotpc <- reactive({
           inputsValue$xaxisPCA <- input$xaxisPCA
           inputsValue$yaxisPCA <- input$yaxisPCA
           inputsValue$colorPCA <- input$colorPCA
           inputsValue$shapePCA <- input$shapePCA
-          g <- ggplot(pcaMeta, aes(x = !!sym(input$xaxisPCA), y = !!sym(input$yaxisPCA),
-                                   text = paste("sample:", meta$sample))) +
-            theme_bw() +
-            theme(legend.position="top") +
-            labs(x=paste0(input$xaxisPCA,": ",
-                          round(varExplained[as.numeric(strsplit(input$xaxisPCA, "PC")[[1]][2])]*100, 1), "%"),
-                 y=paste0(input$yaxisPCA,": ",
-                          round(varExplained[as.numeric(strsplit(input$yaxisPCA, "PC")[[1]][2])]*100, 1), "%")) +
-            scale_shape(solid = FALSE)
           
-          if (input$colorPCA == "none" & input$shapePCA == "none") {
-            g <- g + geom_point(size = 2)
-          }
-          else if (input$colorPCA == "none") {
-            g <- g + geom_point(aes_string(shape = input$shapePCA), size = 2)
-          }
-          else if (input$shapePCA == "none") {
-            g <- g + geom_point(aes_string(color = input$colorPCA), size = 2)
-          }
-          else {
-            g <- g + geom_point(aes_string(color = input$colorPCA,
-                                    shape = input$shapePCA),
-                                size = 2)
-          }
+          plotPCA(pca, processedData(), xaxis = input$xaxisPCA,
+                  yaxis = input$yaxisPCA, color = input$colorPCA,
+                  shape = input$shapePCA)
           
         })
         output$pcplot <- renderPlotly({
