@@ -520,34 +520,32 @@ shinyServer(function(input, output, session) {
     numericInput("numClustRow", "Number of row clusters", value = 1)
   })
   
-  # for top variants based on standard deviation
-  orderID <- reactive({
-    exprMat <- assays(processedData())[["imputed"]]
-    sds <- apply(exprMat, 1, sd)
-    return(names(sort(sds, decreasing = TRUE)))
-  })
-  
   plotMap <- eventReactive(input$doPlot, {
     
     if (input$chooseType == "Top variant") {
-      inputsValue$chooseType <- input$chooseType
-      # plot top variant genes
       inputsValue$numGenes <- input$numGenes
       setName <- sprintf("Top %s most variant genes", input$numGenes)
-      geneIDs <- orderID()[seq(1, as.integer(input$numGenes))]
-      exprMat <- assays(processedData())[["imputed"]][geneIDs,]
-      geneSymbol <- rowData(processedData()[match(geneIDs, rownames(processedData())),])$Gene
-    } 
+      p <- plotHeatmap(type = input$chooseType,
+                       se = processedData(),
+                       top = input$numGenes,
+                       annotationCol = input$colAnnoHM,
+                       cutCol = input$numClustCol,
+                       cutRow = input$numClustRow,
+                       title = setName)
+    }
     else if (input$chooseType == "Differentially expressed") {
-      # plot differentially expressed genes
       if(!is.null(filterDE())) {
-        inputsValue$chooseType <- input$chooseType
         setName <- "Differentially expressed genes"
-        # prepare the data matrix
-        geneIDs <- arrange(filterDE(), stat)$ID
-        exprMat <- assays(processedDataSub())[["imputed"]][geneIDs,] 
-        geneSymbol <- filterDE()[match(geneIDs, filterDE()$ID),]$Gene
-        }
+        p <- plotHeatmap(type = input$chooseType,
+                         se = processedDataSub(),
+                         data = filterDE(),
+                         annotationCol = input$colAnnoHM,
+                         cutCol = input$numClustCol,
+                         cutRow = input$numClustRow,
+                         clustCol = FALSE,
+                         clustRow = FALSE,
+                         title = setName)
+      }
       else {
         showModal(modalDialog(
           title = "Plotting heatmap not possible...",
@@ -558,15 +556,18 @@ shinyServer(function(input, output, session) {
       }
     }
     else if (input$chooseType == "Selected time series cluster") {
-      # plot genes from the selected cluster
       if(!is.null(selectedCluster())) {
-        inputsValue$chooseType <- input$chooseType
         inputsValue$seleClusterHM <- input$seleCluster
         setName <- input$seleCluster
-        # prepare the data matrix
-        geneIDs <- unique(selectedCluster()$ID)
-        exprMat <- assays(processedDataSub())[["imputed"]][geneIDs,] 
-        geneSymbol <- selectedCluster()[match(geneIDs, selectedCluster()$ID),]$Gene
+        p <- plotHeatmap(type = input$chooseType,
+                         se = processedDataSubClust(),
+                         data = selectedCluster(),
+                         annotationCol = input$colAnnoHM,
+                         cutCol = input$numClustCol,
+                         cutRow = input$numClustRow,
+                         clustCol = FALSE,
+                         clustRow = FALSE,
+                         title = setName)
       }
       else {
         showModal(modalDialog(
@@ -577,72 +578,10 @@ shinyServer(function(input, output, session) {
         ))
       }
     }
-    
-    # prepare column annotations
-    cd <- as.data.frame(colData(processedData()))
-    annCol <- cd[row.names(cd) %in% colnames(exprMat),][c(input$colAnnoHM)]
-    #annCol <- cd[colnames(exprMat), input$colAnno, drop=FALSE]
-    row.names(annCol) <- colnames(exprMat)
-    
-    # prepare color scale
-    color <- colorRampPalette(c("navy", "white", "firebrick"))(100)
-    
-    # manual row normalization
-    exprMat <- t(scale(t(exprMat)))
-    exprMat[exprMat > 4] <- 4
-    exprMat[exprMat < -4] <- -4
-    
-    # plot heatmap
-    if (input$chooseType == "Top variant") {
-      inputsValue$numClustCol <- input$numClustCol
-      inputsValue$numClustRow <- input$numClustRow
-      if (is.null(input$colAnnoHM)) {
-        p <- pheatmap(exprMat, color = color,
-                      labels_row = geneSymbol,
-                      treeheight_row = 0, treeheight_col = 0,
-                      main = setName,
-                      cutree_cols = input$numClustCol,
-                      cutree_rows = input$numClustRow,
-                      silient = TRUE)
-      }
-      else {
-        inputsValue$colAnnoHM <- input$colAnnoHM
-        p <- pheatmap(exprMat, color = color,
-                      labels_row = geneSymbol,
-                      treeheight_row = 0, treeheight_col = 0,
-                      main = setName,
-                      cutree_cols = input$numClustCol,
-                      cutree_rows = input$numClustRow,
-                      annotation_col = annCol,
-                      silient = TRUE)
-      }
-    }
-    else {
-      # first sort the columns by column names
-      exprMat <- exprMat[, sort(colnames(exprMat))]
-      if (is.null(input$colAnnoHM)) {
-        p <- pheatmap(exprMat, color = color,
-                      labels_row = geneSymbol,
-                      treeheight_row = 0, treeheight_col = 0,
-                      main = setName,
-                      cluster_rows = FALSE, cluster_cols = FALSE,
-                      cutree_cols = input$numClustCol,
-                      cutree_rows = input$numClustRow,
-                      silient = TRUE)
-      }
-      else {
-        inputsValue$colAnnoHM <- input$colAnnoHM
-        p <- pheatmap(exprMat, color = color,
-                      labels_row = geneSymbol,
-                      treeheight_row = 0, treeheight_col = 0,
-                      main = setName,
-                      cluster_rows = FALSE, cluster_cols = FALSE,
-                      cutree_cols = input$numClustCol,
-                      cutree_rows = input$numClustRow,
-                      annotation_col = annCol,
-                      silient = TRUE)
-      }
-    }
+    inputsValue$chooseType <- input$chooseType
+    inputsValue$colAnnoHM <- input$colAnnoHM
+    inputsValue$numClustCol <- input$numClustCol
+    inputsValue$numClustRow <- input$numClustRow
     p
   })
   
@@ -781,7 +720,7 @@ shinyServer(function(input, output, session) {
     radioButtons("deMethod", "Select DE method", allowChoice, inline = TRUE)
   })
   
-  # a reactive object for subsetting RNAseq dataset
+  # a reactive object for subsetting the assay
   processedDataSub <- reactive({
     processedData.sub <- processedData()[,processedData()$sample %in% c(listIDforDE1(),listIDforDE2())]
     processedData.sub$comparison <-  ifelse(processedData.sub$sample %in% listIDforDE1(), "reference", "target")
@@ -1112,6 +1051,8 @@ shinyServer(function(input, output, session) {
   # reactive value to save all the timepoints
   allTime <- reactiveVal()
   
+  # rea
+  
   # selecting time range
   output$timerangeBox <- renderUI({
     # list the time points available to the selected condition
@@ -1408,6 +1349,8 @@ shinyServer(function(input, output, session) {
     exprMat
   })
   
+  
+  
   clusterPlotVal <- reactiveVal()
   clusterTabVal <- reactiveVal()
   
@@ -1421,6 +1364,19 @@ shinyServer(function(input, output, session) {
     
     clusterPlotVal(cowplot::plot_grid(p1,p2,NULL,NULL, ncol=2))
     clustNum(6)
+  })
+  
+  # Subset se object for heatmap visualization
+  processedDataSubClust <- reactive({
+    if (input$clusterFor == "expression") {
+      processedData.sub <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster
+                                           & processedData()$timepoint %in% input$seleTimeRange]
+    } 
+    else {
+      processedData.sub <- processedData()[,processedData()[[input$seleMetaColTime]] %in% c(input$seleTreat_cluster, input$seleTreat_clusterRef)
+                                           & processedData()$timepoint %in% input$seleTimeRange]
+    }
+    processedData.sub
   })
   
   # plot time-series clustering result
