@@ -857,30 +857,10 @@ shinyServer(function(input, output, session) {
   
   # volcano plot
   plotV <- reactive({
-    dataVolcano <- data.frame(tableDE())
-    dataVolcano$ID <- as.character(dataVolcano$ID)
-    dataVolcano <- mutate(dataVolcano, expression = case_when(
-      dataVolcano$log2FC >= as.numeric(input$fcFilter) & dataVolcano$pvalue <= as.numeric(input$pFilter) ~ "Up",
-      dataVolcano$log2FC <= -as.numeric(input$fcFilter) & dataVolcano$pvalue <= as.numeric(input$pFilter) ~ "Down",
-      dataVolcano$pvalue > as.numeric(input$pFilter) | (dataVolcano$log2FC < as.numeric(input$fcFilter) & dataVolcano$log2FC > -as.numeric(input$fcFilter)) ~ "Not Sig"
-    ))
-    # customdata is used for finding the actual data when a user click on a volcano plot point
-    plot <- ggplot(dataVolcano, aes(x = log2FC, y = -log10(pvalue), label = Gene, customdata = ID)) +
-      geom_vline(xintercept = 0, color = "black", linetype = "solid", size = 0.25) +
-      geom_vline(xintercept = as.numeric(input$fcFilter), color = "darkgrey", linetype = "dashed") +
-      geom_vline(xintercept = -as.numeric(input$fcFilter), color = "darkgrey", linetype = "dashed") +
-      geom_hline(yintercept = -log10(as.numeric(input$pFilter)), color = "darkgrey", linetype = "dashed") +  
-      annotate(x = 5.0, y = -log10(as.numeric(input$pFilter))-0.1, label = paste("P-value = ", as.numeric(input$pFilter)),
-               geom = "text", size = 3, color = "darkgrey") +
-      geom_hline(yintercept = -log10(0.25), color="darkgrey", linetype = "dashed") +  
-      annotate(x = 5.0, y = 0.5, label = paste("P-value = ", 0.25),
-               geom = "text", size=3, color="darkgrey") +
-      geom_point(aes(color = expression), size = 0.9) +
-      scale_color_manual(values = c("Up" = "firebrick3", "Down" = "navy", "Not Sig" = "darkgrey")) +
-      xlab("absolute log2(Quantity) difference") +
-      ggtitle("Volcano plot") +
-      theme(plot.title = element_text(hjust=0.5))
-    plot
+    v <- plotVolcano(tableDE = tableDE(),
+                     pFilter = input$pFilter,
+                     fcFilter = input$fcFilter)
+    v
   })
   
   output$plotVolcano <- renderPlotly({

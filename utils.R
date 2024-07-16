@@ -188,7 +188,7 @@ plotPCA <- function(pca, se, xaxis = "PC1", yaxis = "PC2", color = "none", shape
 #' `plotHeatmap` generates a heatmap for intensity assay for different conditions, including top variants, differentially expressed genes, and selected time series clusters.
 #'
 #' @param type A character string specifying the type of heatmap to plot. Options are `"Top variant"`, `"Differentially expressed"`, and `"Selected time series cluster"`.
-#' @param se A SummarizedExperiment object containing the gene expression data.
+#' @param se A SummarizedExperiment object containing the imputed intensity assay.
 #' @param data An optional data frame containing additional data for `"Differentially expressed"` and `"Selected time series cluster"` types. Default is `NULL`.
 #' @param top An integer specifying the number of top variants to plot. Default is `100`.
 #' @param cutCol An integer specifying the number of clusters for columns. Default is `1`.
@@ -304,6 +304,65 @@ plotHeatmap <- function(type, se, data = NULL, top = 100, cutCol = 1, cutRow = 1
     }
   }
   return(p)
+}
+
+
+#' @name plotVolcano
+#' 
+#' @title Plot Volcano Plot for Differential Expression Analysis
+#'
+#' @description
+#' `plotVolcano` generates a volcano plot to visualize differential expression results.
+#'
+#' @param tableDE A data frame containing differential expression results with columns 'ID', 'log2FC', 'pvalue', and 'Gene'.
+#' @param pFilter A numeric value specifying the p-value threshold for significance. Default is `0.05`.
+#' @param fcFilter A numeric value specifying the log2 fold-change threshold for significance. Default is `0.5`.
+#'
+#' @return A ggplot object representing the volcano plot.
+#'
+#' @details
+#' This function creates a volcano plot where differentially expressed genes are categorized as 'Up', 'Down', or 'Not Sig' based on the provided p-value and log2 fold-change thresholds. Points on the plot are color-coded to indicate their expression status.
+#'
+#' @importFrom ggplot2 ggplot aes geom_vline geom_hline geom_point annotate scale_color_manual xlab ggtitle theme
+#' @importFrom dplyr mutate case_when
+#' @examples
+#' # Assuming 'tableDE' is a data frame containing differential expression results:
+#' volcanoPlot <- plotVolcano(tableDE, pFilter = 0.05, fcFilter = 0.5)
+#' print(volcanoPlot)
+#'
+#' @export
+plotVolcano <- function(tableDE, pFilter = 0.05, fcFilter = 0.5) {
+  
+  # Convert the input table to a data frame and ensure the 'ID' column is of type character
+  dataVolcano <- data.frame(tableDE)
+  dataVolcano$ID <- as.character(dataVolcano$ID)
+  # Categorize each gene based on the provided p-value and log2 fold-change thresholds
+  dataVolcano <- mutate(dataVolcano, expression = case_when(
+    dataVolcano$log2FC >= as.numeric(fcFilter) & dataVolcano$pvalue <= as.numeric(pFilter) ~ "Up",
+    dataVolcano$log2FC <= -as.numeric(fcFilter) & dataVolcano$pvalue <= as.numeric(pFilter) ~ "Down",
+    dataVolcano$pvalue > as.numeric(pFilter) | (dataVolcano$log2FC < as.numeric(fcFilter) & dataVolcano$log2FC > -as.numeric(fcFilter)) ~ "Not Sig"
+  ))
+  
+  # Create the volcano plot
+  v <- ggplot(dataVolcano, aes(x = log2FC, y = -log10(pvalue), label = Gene, customdata = ID)) +
+    # Add vertical lines for fold-change thresholds
+    geom_vline(xintercept = 0, color = "black", linetype = "solid", size = 0.25) +
+    geom_vline(xintercept = as.numeric(fcFilter), color = "darkgrey", linetype = "dashed") +
+    geom_vline(xintercept = -as.numeric(fcFilter), color = "darkgrey", linetype = "dashed") +
+    # Add horizontal lines for p-value thresholds
+    geom_hline(yintercept = -log10(as.numeric(pFilter)), color = "darkgrey", linetype = "dashed") +
+    annotate(x = 5.0, y = -log10(as.numeric(pFilter))-0.1, label = paste("P-value = ", as.numeric(pFilter)),
+             geom = "text", size = 3, color = "darkgrey") +
+    geom_hline(yintercept = -log10(0.25), color="darkgrey", linetype = "dashed") +
+    annotate(x = 5.0, y = 0.5, label = paste("P-value = ", 0.25),
+             geom = "text", size=3, color="darkgrey") +
+    # Plot the points and color them based on their expression status
+    geom_point(aes(color = expression), size = 0.9) +
+    scale_color_manual(values = c("Up" = "firebrick3", "Down" = "navy", "Not Sig" = "darkgrey")) +
+    xlab("absolute log2(Quantity) difference") +
+    ggtitle("Volcano plot") +
+    theme(plot.title = element_text(hjust=0.5))
+  return(v)
 }
 
 
