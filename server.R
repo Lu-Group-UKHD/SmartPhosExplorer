@@ -662,72 +662,14 @@ shinyServer(function(input, output, session) {
     }
   })
   
-  # List of sample ID for reference group
-  listIDforDE1 <- reactive(
-    if (input$seleID) {
-      inputsValue$seleID1 <- input$seleID1
-      selectedID <- input$seleID1
-      selectedID
-    } 
-    else {
-      if (!is.null(processedData()$timepoint)) {
-        inputsValue$Treat1 <- input$seleTreat1
-        inputsValue$Time1 <- input$seleTime1
-        selectedID <- processedData()[,processedData()[[input$seleMetaColDiff]] %in% input$seleTreat1 & processedData()$timepoint %in% input$seleTime1]$sample
-      }
-      else {
-        inputsValue$Treat1 <- input$seleTreat1
-        selectedID <-processedData()[,processedData()[[input$seleMetaColDiff]] %in% input$seleTreat1]$sample
-      }
-      selectedID
-    }
-  )
-  
-  # List of sample ID for target group
-  listIDforDE2 <- reactive(
-    if (input$seleID) {
-      inputsValue$seleID2 <- input$seleID2
-      selectedID <- input$seleID2
-      selectedID
-    } 
-    else {
-      if (!is.null(processedData()$timepoint)) {
-        inputsValue$Treat2 <- input$seleTreat2
-        inputsValue$Time2 <- input$seleTime2
-        selectedID <- processedData()[,processedData()[[input$seleMetaColDiff]] %in% input$seleTreat2 & processedData()$timepoint %in% input$seleTime2]$sample
-      }
-      else {
-        inputsValue$Treat2 <- input$seleTreat2
-        selectedID <- processedData()[,processedData()[[input$seleMetaColDiff]] %in% input$seleTreat2]$sample
-      }
-      selectedID
-    }
-  )
-  
-  output$infoDE <- renderUI({
-    if ((!is.null(listIDforDE1())) & (!is.null(listIDforDE2()))) {
-      if (length(base::intersect(listIDforDE1(), listIDforDE2())) > 0) {
-        HTML(sprintf("<b>Reference group has %s samples<br/>Target group has %s samples<b><br/>WARNING: some sample(s) are present in both groups<b><br/> ",
-                   length(listIDforDE1()), length(listIDforDE2())))} else {
-        HTML(sprintf("<b>Reference group has %s samples<br/>Target group has %s samples<b><br/> ",
-                                  length(listIDforDE1()), length(listIDforDE2())))
-        }
-    }
-  })
-  
   output$seleMethodBox <- renderUI({
     allowChoice <- c("limma", "ProDA")
     radioButtons("deMethod", "Select DE method", allowChoice, inline = TRUE)
   })
   
-  # a reactive object for subsetting the assay
-  processedDataSub <- reactive({
-    processedData.sub <- processedData()[,processedData()$sample %in% c(listIDforDE1(),listIDforDE2())]
-    processedData.sub$comparison <-  ifelse(processedData.sub$sample %in% listIDforDE1(), "reference", "target")
-    processedData.sub$comparison <- factor(processedData.sub$comparison, levels = c("reference", "target"))
-    processedData.sub
-  })
-  
+  # a reactive value to store the se object after subsetting
+  processedDataSub <- reactiveVal()
+  # a reactive value to store the differential expression results
   tableDE <- reactiveVal()
   # a reactive value to monitor if plot histogram or boxplot
   ifHistogram <- reactiveValues(value = TRUE)
@@ -747,48 +689,42 @@ shinyServer(function(input, output, session) {
   # reactive event for calculating differential expression
   observeEvent(input$runDE, {
     withProgress(message = "Running DE analysis, please wait...", value = NULL, {
-      seqMat <- processedDataSub()
-      exprMat <- assays(seqMat)[["Intensity"]]
-      colData <- data.frame(colData(seqMat))
       tryCatch({
-        # design matrix
-        if(is.null(processedDataSub()$subjectID)) {
-          design <- model.matrix(~ comparison, data = colData)
-        } else {
-          design <- model.matrix(~ subjectID + comparison, data = colData)
+        if (input$seleID) {
+          inputsValue$seleID1 <- input$seleID1
+          inputsValue$seleID2 <- input$seleID2
+          de <- performDifferentialExp(se = processedData(), assay = "Intensity",
+                                       method = input$deMethod,
+                                       reference = input$seleID1,
+                                       target = input$seleID2)
         }
-        resNames <- colnames(design)
-        meta <- as.data.frame(elementMetadata(processedDataSub()))
-        if (input$deMethod == "limma") {
-          inputsValue$deMethod <- input$deMethod
-          fit <- limma::lmFit(exprMat, design = design)
-          fit2 <- eBayes(fit)
-          resDE <- topTable(fit2, number = Inf, coef=resNames[length(resNames)])
-          # get result
-          resDE <- merge(resDE, meta, by=0, all=TRUE)
-          resDE <- as_tibble(resDE) %>%
-            dplyr::rename(log2FC = logFC, stat = t,
-                          pvalue = P.Value, padj = adj.P.Val, ID = Row.names) %>%
-            select(-c(B, AveExpr)) %>%
-            filter(!is.na(padj)) %>%
-            arrange(pvalue)
+        else {
+          inputsValue$seleMetaColDiff <- input$seleMetaColDiff
+          inputsValue$Treat1 <- input$seleTreat1
+          inputsValue$Treat2 <- input$seleTreat2
+          if (!is.null(processedData()$timepoint)) {
+            inputsValue$Time1 <- input$seleTime1
+            inputsValue$Time2 <- input$seleTime2
+            de <- performDifferentialExp(se = processedData(), assay = "Intensity",
+                                         method = input$deMethod,
+                                         condition = input$seleMetaColDiff,
+                                         reference = input$seleTreat1,
+                                         target = input$seleTreat2,
+                                         refTime = input$seleTime1,
+                                         targetTime = input$seleTime2)
+          }
+          else {
+            de <- performDifferentialExp(se = processedData(), assay = "Intensity",
+                                         method = input$deMethod,
+                                         condition = input$seleMetaColDiff,
+                                         reference = input$seleTreat1,
+                                         target = input$seleTreat2)
+          }
         }
-        else if (input$deMethod == "ProDA") {
-          inputsValue$deMethod <- input$deMethod
-          fit <- proDA::proDA(exprMat, design = design)
-          resDE <- proDA::test_diff(fit, contrast = resNames[length(resNames)])
-          # get result
-          rownames(resDE) <- resDE[,1]
-          resDE[,1] <- NULL
-          resDE <- merge(resDE, meta, by=0, all=TRUE)
-          resDE <- as_tibble(resDE) %>%
-            dplyr::rename(log2FC = diff, stat = t_statistic,
-                          pvalue = pval, padj = adj_pval, ID = Row.names) %>%
-            select(-c(se, df, avg_abundance, n_approx, n_obs)) %>%
-            filter(!is.na(padj)) %>%
-            arrange(pvalue)
-        }
-        tableDE(resDE)
+        inputsValue$deMethod <- input$deMethod
+        
+        processedDataSub(de$seSub)
+        tableDE(de$resDE)
         ifHistogram$value <- TRUE
       },
       error = function(e) {
@@ -945,34 +881,10 @@ shinyServer(function(input, output, session) {
       }
       # Box-plot for comparison
       else {
-        inputsValue$geneID_DE <- geneID <- lastClicked$geneID
-        inputsValue$geneSymbol_DE <- geneSymbol <- lastClicked$geneSymbol
+        inputsValue$geneID_DE <- lastClicked$geneID
+        inputsValue$geneSymbol_DE <- lastClicked$geneSymbol
        
-        seqMat <- processedDataSub()
-        exprMat <- assays(seqMat)[["Intensity"]]
-        
-        if(is.null(processedDataSub()$subjectID)) {
-          plotTab <- data.frame(group = seqMat$comparison,
-                                value = exprMat[geneID,])
-          p <- ggplot(plotTab, aes(x= group, y = value)) 
-        } else {
-          plotTab <- data.frame(group = seqMat$comparison,
-                                value = exprMat[geneID,],
-                                subjectID = seqMat$subjectID)
-          p <- ggplot(plotTab, aes(x= group, y = value, label = subjectID)) +
-            geom_line(aes(group = subjectID), linetype = "dotted", color = "grey50")
-        }
-        
-        p <- p + geom_boxplot(aes(fill = group),
-                              width = 0.5, alpha = 0.5,
-                              outlier.shape = NA) + 
-          geom_point() + 
-          ylab("Normalized Intensities") + xlab("") + 
-          ggtitle(geneSymbol) + theme_bw() + 
-          theme(text=element_text(size=15), 
-                plot.title = element_text(hjust = 0.5),
-                legend.position = "none",
-                axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5, size = 15))
+        p <- plotBox(se = processedDataSub(), id = lastClicked$geneID, symbol = lastClicked$geneSymbol)
       }
     }
   })
@@ -994,6 +906,7 @@ shinyServer(function(input, output, session) {
   
   # the selection box to select the reference condition
   output$clusterTreatRefBox <- renderUI({
+    inputsValue$seleMetaColTime <- input$seleMetaColTime
     allTreat <- unique(processedData()[[input$seleMetaColTime]])
     allTreat <- allTreat[!allTreat %in% input$seleTreat_cluster]
     selectInput("seleTreat_clusterRef","Select a reference condition", allTreat)
@@ -1030,8 +943,6 @@ shinyServer(function(input, output, session) {
   
   # reactive value to save all the timepoints
   allTime <- reactiveVal()
-  
-  # rea
   
   # selecting time range
   output$timerangeBox <- renderUI({
@@ -1074,6 +985,7 @@ shinyServer(function(input, output, session) {
     }
   })
   
+  # UI for conditions with zero timepoint
   output$zeroTreat <- renderUI({
     if (input$addZero) {
       cd <- colData(processedData())
@@ -1218,7 +1130,7 @@ shinyServer(function(input, output, session) {
         }) %>% bind_cols() %>% as.matrix()
       } else { # i.e. if choose not to spline filter
         
-        # calculate the mean intensities per time point, THEN calculate the logFC
+        # Calculate the mean intensities per time point, THEN calculate the logFC
         
         assayMatMean <- lapply(unique(processedDataSub$timepoint), function(tp) {
           rowMeans(assayMat[,processedDataSub$timepoint == tp])
@@ -1328,8 +1240,6 @@ shinyServer(function(input, output, session) {
     exprMat <- exprMat[complete.cases(exprMat), ]
     exprMat
   })
-  
-  
   
   clusterPlotVal <- reactiveVal()
   clusterTabVal <- reactiveVal()
@@ -1476,16 +1386,16 @@ shinyServer(function(input, output, session) {
                                 input$seleZeroTreat, input$seleTimeRange)
         }
         else {
-          seqMat <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster & 
+          seqMat <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster &
                                       processedData()$timepoint %in% input$seleTimeRange]
         }
         yLabText <- "Normalized expression"
-      } 
+      }
       else if (input$clusterFor == "logFC"){
         if (!is.null(input$seleZeroTreat) & input$addZero) {
           processedDataSub <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster]
           allTimepoint <- unique(processedDataSub$timepoint)
-          
+
           processedDataRef <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef]
           timepointRef <- unique(processedDataRef$timepoint)
           # add zero timepoint samples if missing
@@ -1498,20 +1408,20 @@ shinyServer(function(input, output, session) {
           else if (!("0min" %in% allTimepoint) & ("0min" %in% timepointRef)) {
             seqMat <- addZeroTime(processedData(), input$seleTreat_cluster,
                                   input$seleZeroTreat, input$seleTimeRange)
-            RefMat <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef & 
+            RefMat <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef &
                                         processedData()$timepoint %in% input$seleTimeRange]
           }
           else if (("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
-            seqMat <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster & 
+            seqMat <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster &
                                         processedData()$timepoint %in% input$seleTimeRange]
             RefMat <- addZeroTime(processedData(), input$seleTreat_clusterRef,
                                   input$seleZeroTreat, input$seleTimeRange)
           }
         }
         else {
-          seqMat <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster & 
+          seqMat <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster &
                                       processedData()$timepoint %in% input$seleTimeRange]
-          RefMat <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef & 
+          RefMat <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef &
                                       processedData()$timepoint %in% input$seleTimeRange]
         }
         # calculate fold change by subtracting assayMat to mean intensities of RefMat
@@ -1519,29 +1429,29 @@ shinyServer(function(input, output, session) {
         if (!is.null(processedData()$subjectID)) {
           fcMat <- lapply(unique(seqMat$timepoint), function(tp) {
             lapply(unique(seqMat$subjectID), function(id) {
-              RefMean = rowMeans(assay(RefMat)[,RefMat$timepoint == tp & 
-                                                 RefMat$subjectID == id]) 
+              RefMean = rowMeans(assay(RefMat)[,RefMat$timepoint == tp &
+                                                 RefMat$subjectID == id])
               assay(seqMat)[,seqMat$timepoint == tp & seqMat$subjectID == id] - RefMean
             })
           }) %>% bind_cols() %>% as.matrix()
         } else {
           fcMat <- lapply(unique(seqMat$timepoint), function(tp) {
-            RefMean = rowMeans(assay(RefMat)[,RefMat$timepoint == tp]) 
+            RefMean = rowMeans(assay(RefMat)[,RefMat$timepoint == tp])
             assay(seqMat)[,seqMat$timepoint == tp] - RefMean
           }) %>% bind_cols() %>% as.matrix()
-        } 
+        }
         rownames(fcMat) <- rownames(assay(seqMat))
         # rearrange columns in seq to match with fcMat to assign the fold change
         seqMat <- seqMat[,colnames(fcMat)]
         # assign fcMat to assay(seqMat)
         assay(seqMat) <- fcMat
         yLabText <- "logFC"
-      } 
+      }
       else if (input$clusterFor == "two-condition expression") {
         if (!is.null(input$seleZeroTreat) & input$addZero) {
           processedDataSub <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster]
           allTimepoint <- unique(processedDataSub$timepoint)
-          
+
           processedDataRef <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef]
           timepointRef <- unique(processedDataRef$timepoint)
           # add zero timepoint samples if missing
@@ -1553,64 +1463,64 @@ shinyServer(function(input, output, session) {
             assay <- cbind(assay(processedData1), assay(processedData2))
             cd <- rbind(colData(processedData1), colData(processedData2))
             emeta <- elementMetadata(processedData())
-            
+
             seqMat <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
           }
           else if (!("0min" %in% allTimepoint) & ("0min" %in% timepointRef)) {
             processedData1 <- addZeroTime(processedData(), input$seleTreat_cluster,
                                           input$seleZeroTreat, input$seleTimeRange)
-            processedData2 <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef & 
+            processedData2 <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef &
                                                 processedData()$timepoint %in% input$seleTimeRange]
             assay <- cbind(assay(processedData1), assay(processedData2))
             cd <- rbind(colData(processedData1), colData(processedData2))
             emeta <- elementMetadata(processedData())
-            
+
             seqMat <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
           }
           else if (("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
-            processedData1 <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster & 
+            processedData1 <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster &
                                                 processedData()$timepoint %in% input$seleTimeRange]
             processedData2 <- addZeroTime(processedData(), input$seleTreat_clusterRef,
                                           input$seleZeroTreat, input$seleTimeRange)
             assay <- cbind(assay(processedData1), assay(processedData2))
             cd <- rbind(colData(processedData1), colData(processedData2))
             emeta <- elementMetadata(processedData())
-            
+
             seqMat <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
           }
         }
         else {
-          seqMat <- processedData()[,processedData()[[input$seleMetaColTime]] %in% c(input$seleTreat_cluster, input$seleTreat_clusterRef) & 
+          seqMat <- processedData()[,processedData()[[input$seleMetaColTime]] %in% c(input$seleTreat_cluster, input$seleTreat_clusterRef) &
                                       processedData()$timepoint %in% input$seleTimeRange]
         }
         yLabText <- "Normalized expression"
       }
-      
+
       # Dotplot of the selected (phospho) protein level
       # time is treated as a numerical variable
       plotTab <- data.frame(time = seqMat$timepoint,
-                            value = assay(seqMat)[geneID,], 
-                            treatment = as.character(seqMat[[input$seleMetaColTime]])) 
+                            value = assay(seqMat)[geneID,],
+                            treatment = as.character(seqMat[[input$seleMetaColTime]]))
       timeUnit <- str_extract(plotTab$time, "h|min")
       timeUnit <- ifelse(is.na(timeUnit), "", timeUnit)
       if ((any(timeUnit == "h")) & (any(timeUnit == "min"))) {
         plotTab[timeUnit == "min","time"] <- 1/60 * as.numeric(gsub("min", "", plotTab[timeUnit == "min","time"]))
-      } 
+      }
       plotTab$time <- as.numeric(gsub("h|min", "", plotTab$time))
       p <- ggplot(plotTab, aes(x= time, y = value)) +
-        geom_point(aes(color = treatment), size=3) + 
+        geom_point(aes(color = treatment), size=3) +
         stat_summary(aes(color=paste("mean",treatment)),fun = mean, geom = "line", linewidth = 2)
       # connect the dots across time points by subjectID if provided
       if (!is.null(seqMat$subjectID)) { # overwrite the plot object if subjectID is provided
         plotTab$subjectID <- seqMat$subjectID
         p <- ggplot(plotTab, aes(x= time, y = value,color = paste0(subjectID,"_",treatment))) +
-          geom_point( size=3) + 
+          geom_point( size=3) +
           stat_summary(fun = mean, geom = "line", linewidth = 1,linetype = "dashed")
-        
+
       }
       p <- p +
-        ylab(yLabText) + xlab("time") + 
-        ggtitle(geneSymbol) + theme_bw() + 
+        ylab(yLabText) + xlab("time") +
+        ggtitle(geneSymbol) + theme_bw() +
         theme(text=element_text(size=15),plot.title = element_text(hjust = 0.5),
               legend.position = "bottom",
               axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5, size=15))
