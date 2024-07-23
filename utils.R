@@ -553,6 +553,185 @@ plotBox <- function(se, id, symbol) {
   return(p)
 }
 
+
+#' @name plotTimeSeries
+#' 
+#' @title Plot Time Series Data for a gene or phospho site from SummarizedExperiment object
+#'
+#' @description
+#' `plotTimeSeries` plots time series data for a given gene or phospho site from a given SummarizedExperiment object, allowing different types of plots such as expression, log fold change, or two-condition expression.
+#'
+#' @param se A SummarizedExperiment object containing the data.
+#' @param type The type of plot to generate. Options are `"expression"`, `"logFC"`, or `"two-condition expression"`.
+#' @param geneID The identifier of the gene or feature to plot.
+#' @param symbol The symbol or name of the gene or feature to use as the plot title.
+#' @param condition The condition corresponds to one of the columns from the colData of SE object.
+#' @param treatment The treatment to use for filtering the data.
+#' @param refTreat The reference treatment to compare against.
+#' @param addZero Logical, whether to add a zero time point to the data. Default is `FALSE`.
+#' @param zeroTreat The treatment to use for adding the zero time point. Default is `NULL`.
+#' @param timerange The range of time points to include in the plot.
+#'
+#' @return A ggplot object representing the time series plot.
+#'
+#' @details
+#' This function generates time series plots for a specified gene or feature from a SummarizedExperiment (SE) object. The type of plot can be one of the following:
+#' - "expression": Plots normalized expression levels over time.
+#' - "logFC": Plots log fold change (logFC) over time, comparing a treatment to a reference treatment.
+#' - "two-condition expression": Plots normalized expression levels over time for two conditions.
+#'
+#' The function can add a zero time point if specified and handles data with and without subject-specific information. The plot includes points for each time point and a summary line representing the mean value.
+#'
+#' The x-axis represents time, and the y-axis represents the selected metric (normalized expression or logFC). The plot is customized with various aesthetic elements, such as point size, line type, axis labels, and title formatting.
+#'
+#' @importFrom ggplot2 ggplot aes geom_point stat_summary geom_line ylab xlab ggtitle theme_bw theme element_text
+#' @importFrom SummarizedExperiment assays
+#' @importFrom dplyr %>% bind_cols filter
+#' @importFrom stringr str_extract
+#' @importFrom stats rowMeans
+#' @examples
+#' # Assuming 'se' is a SummarizedExperiment object with appropriate data:
+#' plotTimeSeries(se, type = "expression", geneID = "gene1", symbol = "Gene 1", condition = "treatment", treatment = "A", refTreat = "B", timerange = c("0h", "1h", "2h"))
+#'
+#' @export
+plotTimeSeries <- function(se, type, geneID, symbol, condition, treatment, refTreat, addZero = FALSE, zeroTreat = NULL, timerange) {
+  
+  if (type == "expression") {
+    # Handle zero time point addition if specified
+    if (!is.null(zeroTreat) & addZero) {
+      seqMat <- addZeroTime(se, treatment, zeroTreat, timerange)
+    }
+    else {
+      seqMat <- se[,se[[condition]] == treatment & se$timepoint %in% timerange]
+    }
+    yLabText <- "Normalized expression"
+  } 
+  else if (type == "logFC"){
+    if (!is.null(zeroTreat) & addZero) {
+      seSub <- se[, se[[condition]] == treatment]
+      allTimepoint <- unique(seSub$timepoint)
+      seRef <- se[, se[[condition]] == refTreat]
+      timepointRef <- unique(seRef$timepoint)
+      
+      # Handle zero time point addition for both treatment and reference
+      if (!("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+        seqMat <- addZeroTime(se, treatment, zeroTreat, timerange)
+        refMat <- addZeroTime(se, refTreat, zeroTreat, timerange)
+      }
+      else if (!("0min" %in% allTimepoint) & ("0min" %in% timepointRef)) {
+        seqMat <- addZeroTime(se, treatment, zeroTreat, timerange)
+        refMat <- se[,se[[condition]] == refTreat & se$timepoint %in% timerange]
+      }
+      else if (("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+        seqMat <- se[,se[[condition]] == treatment & se$timepoint %in% timerange]
+        refMat <- addZeroTime(se, refTreat, zeroTreat, timerange)
+      }
+    }
+    else {
+      seqMat <- se[,se[[condition]] == treatment & se$timepoint %in% timerange]
+      refMat <- se[,se[[condition]] == refTreat & se$timepoint %in% timerange]
+    }
+    # Calculate log fold change
+    # Here the mean intensities in refMat are calculated per time point or per time point and subject ID.
+    if (!is.null(se$subjectID)) {
+      fcMat <- lapply(unique(seqMat$timepoint), function(tp) {
+        lapply(unique(seqMat$subjectID), function(id) {
+          refMean = rowMeans(assay(refMat)[,refMat$timepoint == tp & 
+                                             refMat$subjectID == id]) 
+          assay(seqMat)[,seqMat$timepoint == tp & seqMat$subjectID == id] - refMean
+        })
+      }) %>% bind_cols() %>% as.matrix()
+    } else {
+      fcMat <- lapply(unique(seqMat$timepoint), function(tp) {
+        refMean = rowMeans(assay(refMat)[,refMat$timepoint == tp]) 
+        assay(seqMat)[,seqMat$timepoint == tp] - refMean
+      }) %>% bind_cols() %>% as.matrix()
+    } 
+    rownames(fcMat) <- rownames(assay(seqMat))
+    # Rearrange columns in seqMat to match with fcMat to assign the fold change
+    seqMat <- seqMat[,colnames(fcMat)]
+    
+    assay(seqMat) <- fcMat
+    yLabText <- "logFC"
+  } 
+  else if (type == "two-condition expression") {
+    if (!is.null(zeroTreat) & addZero) {
+      seSub <- se[, se[[condition]] == treatment]
+      allTimepoint <- unique(seSub$timepoint)
+      seRef <- se[, se[[condition]] == refTreat]
+      timepointRef <- unique(seRef$timepoint)
+      
+      # Handle zero time point addition for both conditions
+      if (!("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+        se1 <- addZeroTime(se, treatment, zeroTreat, timerange)
+        se2 <- addZeroTime(se, refTreat, zeroTreat, timerange)
+        assay <- cbind(assay(se1), assay(se2))
+        cd <- rbind(colData(se1), colData(se2))
+        emeta <- elementMetadata(se)
+        
+        seqMat <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
+      }
+      else if (!("0min" %in% allTimepoint) & ("0min" %in% timepointRef)) {
+        se1 <- addZeroTime(se, treatment, zeroTreat, timerange)
+        se2 <- se[, se[[condition]] == refTreat & se$timepoint %in% timerange]
+        assay <- cbind(assay(se1), assay(se2))
+        cd <- rbind(colData(se1), colData(se2))
+        emeta <- elementMetadata(se)
+        
+        seqMat <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
+      }
+      else if (("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+        se1 <- se[, se[[condition]] == treatment & se$timepoint %in% timerange]
+        se2 <- addZeroTime(se, refTreat, zeroTreat, timerange)
+        assay <- cbind(assay(se1), assay(se2))
+        cd <- rbind(colData(se1), colData(se2))
+        emeta <- elementMetadata(se)
+        
+        seqMat <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
+      }
+    }
+    else {
+      seqMat <- se[,se[[condition]] %in% c(treatment, refTreat) & se$timepoint %in% timerange]
+    }
+    yLabText <- "Normalized expression"
+  }
+  
+  # Create data frame for plotting
+  plotTab <- data.frame(time = seqMat$timepoint,
+                        value = assay(seqMat)[geneID,], 
+                        treatment = as.character(seqMat[[condition]])) 
+  
+  # Convert time to numerical values
+  timeUnit <- str_extract(plotTab$time, "h|min")
+  timeUnit <- ifelse(is.na(timeUnit), "", timeUnit)
+  if ((any(timeUnit == "h")) & (any(timeUnit == "min"))) {
+    plotTab[timeUnit == "min","time"] <- 1/60 * as.numeric(gsub("min", "", plotTab[timeUnit == "min","time"]))
+  } 
+  plotTab$time <- as.numeric(gsub("h|min", "", plotTab$time))
+  
+  # Create the ggplot object
+  p <- ggplot(plotTab, aes(x= time, y = value)) +
+    geom_point(aes(color = treatment), size=3) + 
+    stat_summary(aes(color=paste("mean",treatment)),fun = mean, geom = "line", linewidth = 2)
+  
+  # Add subject-specific lines if subjectID is present
+  if (!is.null(seqMat$subjectID)) {
+    plotTab$subjectID <- seqMat$subjectID
+    p <- ggplot(plotTab, aes(x= time, y = value,color = paste0(subjectID,"_",treatment))) +
+      geom_point( size=3) + 
+      stat_summary(fun = mean, geom = "line", linewidth = 1,linetype = "dashed")
+    
+  }
+  
+  # Finalize plot with labels and theme
+  p <- p +
+    ylab(yLabText) + xlab("time") + 
+    ggtitle(symbol) + theme_bw() + 
+    theme(text=element_text(size=15),plot.title = element_text(hjust = 0.5),
+          legend.position = "bottom",
+          axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5, size=15))
+  return(p)
+}
 ########################################## Normalization Correction ######################################
 
 
