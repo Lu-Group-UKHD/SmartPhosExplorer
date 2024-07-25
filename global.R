@@ -27,4 +27,11 @@ library(proDA)
 library(piano)
 library(tidyverse) #tidyverse should normally always be the last
 
+source("basic_visualizations.R")
+source("normalization_correction.R")
+source("preprocess_proteome_phospho.R")
+source("differential_expression.R")
+source("time_series_clustering.R")
+source("enrichment.R")
+source("kinase_activity.R")
 source("utils.R")
