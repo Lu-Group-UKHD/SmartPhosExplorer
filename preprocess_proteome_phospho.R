@@ -1,3 +1,38 @@
+#' @name getOneSymbol
+#' 
+#' @title Extract the Last Gene Symbol from a Semicolon-Separated List
+#'
+#' @description
+#' `getOneSymbol` extracts the last gene symbol from a semicolon-separated list of gene symbols.
+#'
+#' @param Gene A character vector where each element is a semicolon-separated list of gene symbols.
+#'
+#' @return A character vector containing the last gene symbol from each element of the input vector.
+#'
+#' @details
+#' This function processes a character vector where each element consists of gene symbols separated by semicolons. It splits each element by semicolons and extracts the last gene symbol from the resulting list. The output is a character vector of these last gene symbols.
+#'
+#' @importFrom stringr str_split
+#' @examples
+#' gene_list <- c("GeneA;GeneB;GeneC", "GeneX;GeneY")
+#' getOneSymbol(gene_list)
+#' # Returns: "GeneC" "GeneY"
+#'
+#' @export
+getOneSymbol <- function(Gene) {
+  # Apply a function to each element in the Gene vector
+  outStr <- sapply(Gene, function(x) {
+    # Split the string by semicolons
+    sp <- str_split(x, ";")[[1]]
+    # Return the last element in the split string
+    sp[length(sp)]
+  })
+  # Remove names from the resulting vector
+  names(outStr) <- NULL
+  return(outStr)
+}
+
+
 #' @name preprocessProteome
 #' 
 #' @title Preprocess Proteome Data
