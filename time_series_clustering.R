@@ -490,18 +490,29 @@ plotTimeSeries <- function(se, type, geneID, symbol, condition, treatment, refTr
     if (!is.null(se$subjectID)) {
       fcMat <- lapply(unique(seqMat$timepoint), function(tp) {
         lapply(unique(seqMat$subjectID), function(id) {
-          refMean = rowMeans(assay(refMat)[,refMat$timepoint == tp & 
-                                             refMat$subjectID == id]) 
+          if (length(colnames(assay(refMat)[,refMat$timepoint == tp & refMat$subjectID == id])) > 1) {
+            refMean = rowMeans(assay(refMat)[,refMat$timepoint == tp & 
+                                               refMat$subjectID == id])
+          } else {
+            refMean = assay(refMat)[,refMat$timepoint == tp & refMat$subjectID == id]
+          }
           assay(seqMat)[,seqMat$timepoint == tp & seqMat$subjectID == id] - refMean
         })
       }) %>% bind_cols() %>% as.matrix()
     } else {
       fcMat <- lapply(unique(seqMat$timepoint), function(tp) {
-        refMean = rowMeans(assay(refMat)[,refMat$timepoint == tp]) 
+        if (length(colnames(assay(refMat)[,refMat$timepoint == tp])) > 1) {
+          refMean = rowMeans(assay(refMat)[,refMat$timepoint == tp]) 
+        } else {
+          refMean = assay(refMat)[,refMat$timepoint == tp]
+        }
+        
         assay(seqMat)[,seqMat$timepoint == tp] - refMean
       }) %>% bind_cols() %>% as.matrix()
     } 
+    
     rownames(fcMat) <- rownames(assay(seqMat))
+    colnames(fcMat) <- colnames(assay(seqMat))
     # Rearrange columns in seqMat to match with fcMat to assign the fold change
     seqMat <- seqMat[,colnames(fcMat)]
     
