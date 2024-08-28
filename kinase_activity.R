@@ -21,7 +21,6 @@
 #' mouse_network <- getDecouplerNetwork("Mus musculus")
 #'
 #' @importFrom utils read.table
-#' @export
 getDecouplerNetwork <- function(speciesRef) {
   
   # load network of kinase-substrate interaction from omnipathR_kinase_network folder
@@ -83,6 +82,11 @@ getDecouplerNetwork <- function(speciesRef) {
 #' 
 #' @export
 calcKinaseScore <- function(resTab, decoupler_network, corrThreshold = 0.9, statType = "stat", nPerm = 100) {
+  
+  # print("resTab")
+  # print(resTab)
+  # print("decoupler_network")
+  # print(head(decoupler_network))
   # Remove duplicate rows based on the 'site' column and keep all other columns
   resTab <- resTab %>%
     distinct(site, .keep_all = TRUE) %>%
@@ -97,12 +101,14 @@ calcKinaseScore <- function(resTab, decoupler_network, corrThreshold = 0.9, stat
   }
   rownames(inputTab) <- NULL
   inputTab <- inputTab %>% data.frame() %>% column_to_rownames("site")
+  print(inputTab)
   # Intersect the input table with the decoupler network to find common regulons
   decoupler_network <- decoupleR::intersect_regulons(mat = inputTab, 
                                                      network = decoupler_network, 
                                                      .source = source, 
                                                      .target = target, 
                                                      minsize = 5)
+  print(decoupler_network)
   # Check for correlated regulons within the decoupler network and remove interactions with correlation >= threshold
   correlated_regulons <- decoupleR::check_corr(decoupler_network) %>%  #not necessary for now
     dplyr::filter(correlation >= corrThreshold)
