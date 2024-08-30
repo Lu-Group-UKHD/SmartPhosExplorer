@@ -1,6 +1,12 @@
 # This script contains the server part for the Phosphoproteomics Shiny app. 
 # The server script acts based on the inputs from the UI script. 
 
+library(shiny)
+library(shinythemes)
+library(shinyjs)
+library(shinyBS)
+library(shinyWidgets)
+
 # Increasing the limit of upload file size from 5 MB to 50 MB
 options(shiny.maxRequestSize=500*1024^2)
 
@@ -225,7 +231,7 @@ shinyServer(function(input, output, session) {
   # whether to normalize phospho data with proteomic data
   output$ifNormByProteinBox <- renderUI({
       if (!is.null(mae())) {
-          if (input$assay == "Phosphoproteome" & "Proteome" %in% names(assays(mae()))) {
+          if (input$assay == "Phosphoproteome" && "Proteome" %in% names(assays(mae()))) {
               checkboxInput("ifNormByProtein","Normalize phosphorylation by protein expression", value = FALSE)
           }
       }
@@ -233,7 +239,7 @@ shinyServer(function(input, output, session) {
   
   output$seleNormCorrect <- renderUI({
     if (!is.null(mae())) {
-      if (input$assay == "Phosphoproteome" & input$getFP == FALSE) {
+      if (input$assay == "Phosphoproteome" && input$getFP == FALSE) {
         checkboxInput("ifNormCorrect","Perform normalization correction (may take long time, no further normalization needed)", value = FALSE)
       }
     }
@@ -263,8 +269,8 @@ shinyServer(function(input, output, session) {
       maeData <- mae()
       
       if (input$assay == "Phosphoproteome") {
-          
-        if (input$ifNormCorrect) {
+        
+        if (!is.null(input$ifNormCorrect) && input$ifNormCorrect) {
           inputsValue$ifNormCorrect <- input$ifNormCorrect
           maeData <- runPhosphoAdjustment(mae(), 
                                           normalization = ifelse(input$ifAlreadyNorm == "Yes", FALSE, TRUE), #depends on whether the data were already normalized
@@ -275,13 +281,12 @@ shinyServer(function(input, output, session) {
           assays(maeData[["Phosphoproteome"]])[["Intensity_adjusted"]] <- NULL
           #maeData <- maeData[, !is.na(maeData$adjustFactorPP)]
           maeAdj(maeData)
-        } 
-         
+        }
         # whether normalize the phospho intensity by protein expression, 
         # if normalization adjustment is performed, this will be performed after normalization adjustment
-        if (input$ifNormByProtein) {
-            inputsValue$ifNormByProtein <- input$ifNormByProtein
-            maeData <- SmartPhos::normByFullProteome(maeData)
+        if (!is.null(input$ifNormByProtein) && input$ifNormByProtein) {
+          inputsValue$ifNormByProtein <- input$ifNormByProtein
+          maeData <- SmartPhos::normByFullProteome(maeData)
         }
       }
       # summarizedAssayExperiment object of the selected assay
@@ -308,7 +313,7 @@ shinyServer(function(input, output, session) {
       else {
         pp <- preprocessPhos(se, filterList = NULL,
                              transform = input$transform,
-                             normalize = ifelse(!is.null(input$ifNormCorrect) & input$ifNormCorrect ==FALSE, input$normalize, FALSE), #if normalization correction has been performed, normalization should not be performed again
+                             normalize = ifelse(!is.null(input$ifNormCorrect) && input$ifNormCorrect ==FALSE, input$normalize, FALSE), #if normalization correction has been performed, normalization should not be performed again
                              getFP = input$getFP,
                              missCut = input$missFilter,
                              removeOutlier = strsplit(input$outliers, ",\\s*")[[1]],
@@ -1009,7 +1014,7 @@ shinyServer(function(input, output, session) {
       inputsValue$clusterFor <- input$clusterFor
       inputsValue$seleTreat_cluster <- input$seleTreat_cluster
       inputsValue$seleTimeRange <- input$seleTimeRange
-      if (!is.null(input$seleZeroTreat) & input$addZero) {
+      if (!is.null(input$seleZeroTreat) && input$addZero) {
         inputsValue$addZero <- input$addZero
         inputsValue$seleZeroTreat <- input$seleZeroTreat
         processedDataSub <- addZeroTime(processedData(), input$seleMetaColTime,
@@ -1053,7 +1058,7 @@ shinyServer(function(input, output, session) {
       inputsValue$clusterFor <- input$clusterFor
       inputsValue$seleTreat_cluster <- input$seleTreat_cluster
       inputsValue$seleTimeRange <- input$seleTimeRange
-      if (!is.null(input$seleZeroTreat) & input$addZero) {
+      if (!is.null(input$seleZeroTreat) && input$addZero) {
         inputsValue$addZero <- input$addZero
         inputsValue$seleZeroTreat <- input$seleZeroTreat
         processedDataSub <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster]
@@ -1061,7 +1066,7 @@ shinyServer(function(input, output, session) {
         processedDataRef <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef]
         timepointRef <- unique(processedDataRef$timepoint)
         # add zero timepoint samples if missing
-        if (!("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+        if (!("0min" %in% allTimepoint) && !("0min" %in% timepointRef)) {
           processedDataSub <- addZeroTime(processedData(), input$seleMetaColTime,
                                           input$seleTreat_cluster,
                                           input$seleZeroTreat, input$seleTimeRange)
@@ -1069,14 +1074,14 @@ shinyServer(function(input, output, session) {
                                           input$seleTreat_clusterRef,
                                           input$seleZeroTreat, input$seleTimeRange)
         }
-        else if (!("0min" %in% allTimepoint) & ("0min" %in% timepointRef)) {
+        else if (!("0min" %in% allTimepoint) && ("0min" %in% timepointRef)) {
           processedDataSub <- addZeroTime(processedData(), input$seleMetaColTime,
                                           input$seleTreat_cluster,
                                           input$seleZeroTreat, input$seleTimeRange)
           processedDataRef <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef & 
                                                 processedData()$timepoint %in% input$seleTimeRange]
         }
-        else if (("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+        else if (("0min" %in% allTimepoint) && !("0min" %in% timepointRef)) {
           processedDataSub <- processedData()[,processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster & 
                                                 processedData()$timepoint %in% input$seleTimeRange]
           processedDataRef <- addZeroTime(processedData(), input$seleMetaColTime,
@@ -1154,7 +1159,7 @@ shinyServer(function(input, output, session) {
       inputsValue$seleTreat_cluster <- input$seleTreat_cluster
       inputsValue$seleTreat_clusterRef <- input$seleTreat_clusterRef
       inputsValue$seleTimeRange <- input$seleTimeRange
-      if (!is.null(input$seleZeroTreat) & input$addZero) {
+      if (!is.null(input$seleZeroTreat) && input$addZero) {
         inputsValue$addZero <- input$addZero
         inputsValue$seleZeroTreat <- input$seleZeroTreat
         processedDataSub <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster]
@@ -1162,7 +1167,7 @@ shinyServer(function(input, output, session) {
         processedDataRef <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_clusterRef]
         timepointRef <- unique(processedDataRef$timepoint)
         # add zero timepoint samples if missing
-        if (!("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+        if (!("0min" %in% allTimepoint) && !("0min" %in% timepointRef)) {
           processedData1 <- addZeroTime(processedData(), input$seleMetaColTime,
                                         input$seleTreat_cluster,
                                         input$seleZeroTreat, input$seleTimeRange)
@@ -1175,7 +1180,7 @@ shinyServer(function(input, output, session) {
           
           processedDataSub <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
         }
-        else if (!("0min" %in% allTimepoint) & ("0min" %in% timepointRef)) {
+        else if (!("0min" %in% allTimepoint) && ("0min" %in% timepointRef)) {
           processedData1 <- addZeroTime(processedData(), input$seleMetaColTime,
                                         input$seleTreat_cluster,
                                         input$seleZeroTreat, input$seleTimeRange)
@@ -1187,7 +1192,7 @@ shinyServer(function(input, output, session) {
           
           processedDataSub <- SummarizedExperiment(assays=SimpleList(intensity=assay), colData = cd, rowData = emeta)
         }
-        else if (("0min" %in% allTimepoint) & !("0min" %in% timepointRef)) {
+        else if (("0min" %in% allTimepoint) && !("0min" %in% timepointRef)) {
           processedData1 <- processedData()[, processedData()[[input$seleMetaColTime]] == input$seleTreat_cluster & 
                                               processedData()$timepoint %in% input$seleTimeRange]
           processedData2 <- addZeroTime(processedData(), input$seleMetaColTime,
@@ -1330,7 +1335,7 @@ shinyServer(function(input, output, session) {
         mutate(feature = as.character(feature)) 
       clusterData <- rowData(processedData()[selectedTab$feature,])
       # If the data is phosphoproteomic: include the columns indicating phosphorylation site and peptide sequence
-      if ((!is.null(clusterData$site)) & (!is.null(clusterData$Sequence))) {
+      if ((!is.null(clusterData$site)) && (!is.null(clusterData$Sequence))) {
         selectedTab <- selectedTab %>%
           mutate(Sequence = clusterData$Sequence,
                  site = clusterData$site)
@@ -1441,7 +1446,7 @@ shinyServer(function(input, output, session) {
   # Note: the analysisMethod is default to Pathway enrichment if the Proteome
   # assay is selected (might change in the future!)
   resGSEA <- observeEvent(input$RunEnrich, {
-    if (input$seleSourceEnrich == "Differential expression" & input$analysisMethod == "Pathway enrichment") {
+    if (input$seleSourceEnrich == "Differential expression" && input$analysisMethod == "Pathway enrichment") {
       # Pathway enrichment for differential expression 
       if (!is.null(filterDE())) {
         output$errMsg <- renderText("")
@@ -1531,7 +1536,7 @@ shinyServer(function(input, output, session) {
         output$errMsg <- renderText("Please perform differential expression analysis first or load a previous result!")
       }
     } 
-    else if (input$seleSourceEnrich =="Selected time-series cluster" & input$analysisMethod =="Pathway enrichment") {
+    else if (input$seleSourceEnrich =="Selected time-series cluster" && input$analysisMethod =="Pathway enrichment") {
       # Pathway enrichment for time series cluster 
       if (nrow(selectedCluster()) > 0) {
         output$errMsg <- renderText("")
@@ -1581,7 +1586,7 @@ shinyServer(function(input, output, session) {
         output$errMsg <- renderText("Please perform time series clustering first!")
       }
     }
-    else if (input$seleSourceEnrich == "All time-series clusters" & input$analysisMethod =="Pathway enrichment") {
+    else if (input$seleSourceEnrich == "All time-series clusters" && input$analysisMethod =="Pathway enrichment") {
       if (nrow(clusterTabVal()) > 0) {
         output$errMsg <- renderText("")
         # withProgress("Running enrichment analysis, please wait..", {
@@ -1616,7 +1621,7 @@ shinyServer(function(input, output, session) {
         output$errMsg <- renderText("Please perform time series clustering first!")
       }
     }
-    else if ((input$seleSourceEnrich == "Differential expression") & (input$analysisMethod == "Phospho-signature enrichment")){
+    else if ((input$seleSourceEnrich == "Differential expression") && (input$analysisMethod == "Phospho-signature enrichment")){
       # Phospho-signature enrichment for differential expression 
       if (!is.null(filterDE())) {
         output$errMsg <- renderText("")
@@ -1681,7 +1686,7 @@ shinyServer(function(input, output, session) {
         })
       } else output$errMsg <- renderText("Please perform differential expression analysis first and make sure you have selected the Phosphoproteome assay!")
     } 
-    else if ((input$seleSourceEnrich == "Selected time-series cluster") & (input$analysisMethod == "Phospho-signature enrichment")) {
+    else if ((input$seleSourceEnrich == "Selected time-series cluster") && (input$analysisMethod == "Phospho-signature enrichment")) {
       # Phospho-signature enrichment for Time-series clustering 
       if (nrow(selectedCluster()) > 0) {
         output$errMsg <- renderText("")
@@ -1726,7 +1731,7 @@ shinyServer(function(input, output, session) {
         })
       } else output$errMsg <- renderText("Please perform time series clustering first and make sure you have selected the Phopshoproteome assay!")
     }
-    else if ((input$seleSourceEnrich =="All time-series clusters") & (input$analysisMethod == "Phospho-signature enrichment")) {
+    else if ((input$seleSourceEnrich =="All time-series clusters") && (input$analysisMethod == "Phospho-signature enrichment")) {
       if (nrow(clusterTabVal()) > 0) {
         output$errMsg <- renderText("")
         # withProgress("Running enrichment analysis, please wait..", {
@@ -1993,7 +1998,7 @@ shinyServer(function(input, output, session) {
     clusterData <- rowData(processedData()[selectedTab$feature,])
     
     # If the data is phosphoproteomic: include the columns indicating phosphorylation site and peptide sequence
-    if ((!is.null(clusterData$site)) & (!is.null(clusterData$Sequence))) {
+    if ((!is.null(clusterData$site)) && (!is.null(clusterData$Sequence))) {
       selectedTab <- selectedTab %>%
         mutate(Sequence = clusterData$Sequence,
                site = clusterData$site)
@@ -2118,7 +2123,7 @@ shinyServer(function(input, output, session) {
                 footer = NULL
               ))})
           })
-        } else output$errMsgKinase <- renderText("Please do a hypothesis testing first")
+        } else output$errMsgKinase <- renderText("Please perform Differential expression analysis first")
       } else {
         
         # Perform the analysis for time-series cluster
@@ -2146,7 +2151,7 @@ shinyServer(function(input, output, session) {
               timeUnit <- suppressWarnings(str_extract(timeVector, "h|min"))
               timeUnit <- ifelse(is.na(timeUnit), "", timeUnit)
               # If both h and min are present, divide the min time points by 60
-              if ((any(timeUnit == "h")) & (any(timeUnit == "min"))) {
+              if ((any(timeUnit == "h")) && (any(timeUnit == "min"))) {
                 timeValue <- timeVector
                 timeValue[timeUnit == "min"] <- 1/60 * as.numeric(gsub("min", "", timeValue[timeUnit == "min"]))
                 timeRank <- rank(as.numeric(gsub("h", "", timeValue)))
@@ -2213,7 +2218,7 @@ shinyServer(function(input, output, session) {
                     # if subjectID is present then match samples by subject ID
                     siteTabTime <- siteTab[,siteTab$timepoint == time]
                     refTabTime <- refTab[,refTab$timepoint == time]
-                    if ((!is.null(siteTab$subjectID)) & (!is.null(refTab$subjectID))) {
+                    if ((!is.null(siteTab$subjectID)) && (!is.null(refTab$subjectID))) {
                       siteTabTime <- siteTabTime[,match(refTabTime$subjectID, siteTabTime$subjectID)]
                       fc <- assay(siteTabTime) - assay(refTabTime)
                       clusterDataTime <- data.frame(site = as.character(rowData(siteTabTime)$site),
@@ -2430,23 +2435,23 @@ shinyServer(function(input, output, session) {
   ################################# log info ###################################
   
   infoTable <- read.delim(file = 'infoTable.tsv', sep = '\t')
-  
+
   allInputs <- reactive({
     values <- reactiveValuesToList(inputsValue)
     df <- lapply(names(values), function(n) {
       v <- paste0(unlist(values[n]), collapse = ",")
-      data.frame(name = n, value = v) 
-    }) %>% bind_rows() 
+      data.frame(name = n, value = v)
+    }) %>% bind_rows()
     df <- left_join(df, infoTable, by = "name")
   })
-  
-  
-  
+
+
+
   output$show_inputs <- renderDataTable({
     datatable(allInputs(), filter = "top", rownames = FALSE,
               selection = "none", style = "bootstrap")
   })
-  
+
   output$downloadLogValues <- downloadHandler(
     filename = function() { paste('Logvalues', '.tsv', sep='') },
     content = function(file) {
