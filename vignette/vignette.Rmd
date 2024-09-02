@@ -72,6 +72,8 @@ This file should be a tab-separated **tsv** file that contains the information i
 
 The above mentioned columns are mandatory ones. Other than that, fileTable.txt can contain optional columns such as:
 
+* **sampleName** column is important for performing normalization correction or  for normalizing Phosphoproteome samples by Full Proteome samples. This should be the sample id without FP_/PP_ or Phospho_/FullProteome_ suffix or prefix. For example, for the sample ID, **FullProteome_1stCrtl_0min_rep1**, the sampleName should be, “**1stCrtl_0min_rep1**". Without this column, it would not be possible to perform normalization correction and normalizing phosphoproteome samples by full proteome samples.
+
 * **subjectID** with information like patientID, cell lines, etc. This column will be used if there are multiple samples from the same subject and users wish to include the subject ID as covariates in hypothesis testing (e.g. paired t-test) or time-series analysis.  
 
 * **timepoint** with values like 0min, 20min, 6h, 24h, etc. This column is important for the time-series clustering tab and other tabs which make use of the results from the time-series clustering tab.  
